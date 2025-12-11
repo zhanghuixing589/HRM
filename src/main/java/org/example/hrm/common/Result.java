@@ -14,48 +14,59 @@ public class Result<T> implements Serializable {
     public Result() {
         this.timestamp = System.currentTimeMillis();
     }
+
+     public Result(Integer code, String message) {
+        this.code = code;
+        this.message = message;
+        this.timestamp = System.currentTimeMillis();
+    }
+    
+    public Result(Integer code, String message, T data) {
+        this.code = code;
+        this.message = message;
+        this.data = data;
+        this.timestamp = System.currentTimeMillis();
+    }
+
     
     public static <T> Result<T> success() {
-        Result<T> result = new Result<>();
-        result.setCode(200);
-        result.setMessage("操作成功");
-        return result;
+       return new Result<>(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage());
     }
     
     public static <T> Result<T> success(T data) {
-        Result<T> result = new Result<>();
-        result.setCode(200);
-        result.setMessage("操作成功");
-        result.setData(data);
-        return result;
+         return new Result<>(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), data);
     }
     
     public static <T> Result<T> success(String message, T data) {
-        Result<T> result = new Result<>();
-        result.setCode(200);
-        result.setMessage(message);
-        result.setData(data);
-        return result;
+        return new Result<>(ResultCode.SUCCESS.getCode(), message, data);
+    }
+
+    public static <T> Result<T> success(ResultCode resultCode, T data) {
+        return new Result<>(resultCode.getCode(), resultCode.getMessage(), data);
     }
     
     public static <T> Result<T> error() {
-        Result<T> result = new Result<>();
-        result.setCode(500);
-        result.setMessage("操作失败");
-        return result;
+         return new Result<>(ResultCode.ERROR.getCode(), ResultCode.ERROR.getMessage());
     }
     
     public static <T> Result<T> error(String message) {
-        Result<T> result = new Result<>();
-        result.setCode(500);
-        result.setMessage(message);
-        return result;
+       return new Result<>(ResultCode.ERROR.getCode(), message);
     }
     
     public static <T> Result<T> error(Integer code, String message) {
-        Result<T> result = new Result<>();
-        result.setCode(code);
-        result.setMessage(message);
-        return result;
+        return new Result<>(code, message);
+    }
+
+     public static <T> Result<T> error(ResultCode resultCode) {
+        return new Result<>(resultCode.getCode(), resultCode.getMessage());
+    }
+    
+    public static <T> Result<T> error(ResultCode resultCode, String message) {
+        return new Result<>(resultCode.getCode(), message);
+    }
+
+    //快速方法
+    public boolean isSuccess() {
+        return ResultCode.SUCCESS.getCode().equals(code);
     }
 }

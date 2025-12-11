@@ -8,6 +8,7 @@ public class HrmApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(HrmApplication.class, args);
+        System.out.println( "HRM Application started successfully!");
     }
 
 }
