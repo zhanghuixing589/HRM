@@ -2,6 +2,7 @@ package org.example.hrm.constant;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,14 @@ import java.util.Map;
  * 统一管理系统中所有的常量值
  */
 public class SalaryConstants {
+
+    /* 试用期常量 */
+    public static final int PROBATION_PERIOD_MONTHS = 3;  // 试用期3个月
+    public static final BigDecimal PROBATION_SALARY_RATIO = new BigDecimal("0.5"); // 试用期工资比例
+    public static final boolean PROBATION_HAS_ALLOWANCE = true;  // 试用期有津贴
+    public static final boolean PROBATION_HAS_BONUS = true;      // 试用期有奖金
+    public static final boolean PROBATION_HAS_INSURANCE = false; // 试用期无社保
+
     /* 项目类型常量 */
     public static final int  PROJECT_TYPE_INCOME = 1; // 收入类项目
     public static final int  PROJECT_TYPE_DEDUCTION = 2; // 扣款类项目
@@ -24,6 +33,29 @@ public class SalaryConstants {
     public static final String CATEGORY_ALLOWANCE = "补贴"; // 补贴
     public static final String CATEGORY_DEDUCTION = "扣款"; // 扣款
     public static final String CATEGORY_INSURANCE = "社保"; // 社保
+
+     // 试用期需要排除的社保项目
+    public static final List<String> INSURANCE_PROJECTS = Arrays.asList(
+        "PENSION_INSURANCE",    // 养老保险
+        "MEDICAL_INSURANCE",    // 医疗保险
+        "UNEMPLOYMENT_INSURANCE", // 失业保险
+        "INJURY_INSURANCE",     // 工伤保险
+        "MATERNITY_INSURANCE",  // 生育保险
+        "HOUSING_FUND"          // 住房公积金
+    );
+    /**
+     * 判断是否为社保项目
+     */
+    public static boolean isInsuranceProject(String projectCode) {
+        return INSURANCE_PROJECTS.contains(projectCode);
+    }
+    
+    /**
+     * 判断是否为基本薪资项目
+     */
+    public static boolean isBaseSalaryProject(String projectCode) {
+        return "BASE_SALARY".equals(projectCode);
+    }
 
     /* 计算方式常量 */
     public static final String CALC_METHOD_FIXED = "固定值"; // 固定金额

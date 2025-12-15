@@ -136,4 +136,23 @@ public class JwtTokenUtil {
     public String getHeader() {
         return header;
     }
+
+    public Long getUserIdFromToken(String token) {
+    try {
+        Claims claims = getAllClaimsFromToken(token);
+        // 从claims中获取userId，注意类型转换
+        Object userIdObj = claims.get("userId");
+        if (userIdObj instanceof Integer) {
+            return ((Integer) userIdObj).longValue();
+        } else if (userIdObj instanceof Long) {
+            return (Long) userIdObj;
+        } else {
+            // 尝试转换为Long
+            return Long.valueOf(userIdObj.toString());
+        }
+    } catch (Exception e) {
+        log.error("从Token中获取用户ID失败", e);
+        return null;
+    }
+}
 }

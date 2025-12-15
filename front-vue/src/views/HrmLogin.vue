@@ -35,7 +35,7 @@ export default {
       this.$refs.form.validate(valid => {
         if (!valid) return
         this.loading = true
-        login(this.form)          // ← 用封装好的 login 函数
+        login(this.form)
           .then(res => {
             if (res.code === 200) {
               localStorage.setItem('token', res.data.token)
