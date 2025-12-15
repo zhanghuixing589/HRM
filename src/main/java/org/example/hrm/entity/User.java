@@ -2,6 +2,7 @@ package org.example.hrm.entity;
 
 import lombok.*;
 import javax.persistence.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,21 +42,23 @@ public class User {
     private Long posId;
     
     @Column(name = "status")
-    private Integer status = 1; // 1-在职，0-离职，2-警用
+    private Integer status = 1; // 1-在职，0-离职，2-禁用
     
     @Column(name = "role_type")
     private Integer roleType; // 角色类型（1-系统管理员，2-人事经理...）
 
-     // 添加入职时间和离职时间
+    // 添加入职时间和离职时间
     @Column(name = "entry_date")
     private LocalDate entryDate; // 入职日期
     
     @Column(name = "leave_date")
     private LocalDate leaveDate; // 离职日期（离职状态时填写）
     
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Column(name = "create_time")
     private LocalDateTime createTime;
     
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Column(name = "update_time")
     private LocalDateTime updateTime;
     

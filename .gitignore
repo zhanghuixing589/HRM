@@ -31,3 +31,5 @@ build/
 
 ### VS Code ###
 .vscode/
+logs/hrm.log
+logs/hrm.log
