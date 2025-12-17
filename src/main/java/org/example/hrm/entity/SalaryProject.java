@@ -1,6 +1,9 @@
 package org.example.hrm.entity;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import javax.persistence.*;
 import java.util.Date;
 
@@ -8,6 +11,7 @@ import java.util.Date;
 @Data
 @Entity
 @Table(name = "project")
+
 public class SalaryProject {
      @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,6 +35,10 @@ public class SalaryProject {
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
 
+     @Column(name = "params", columnDefinition = "TEXT")
+    private String params; // JSON格式的参数字符串
+
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt;
@@ -45,6 +53,16 @@ public class SalaryProject {
     @PrePersist
     protected void onCreate() {
         this.createdAt = new Date();
+    }
+
+     // 如果确实缺少getId()方法，手动添加
+    public Long getId() {
+        return this.projectId; // 注意：这里返回projectId，因为字段名是projectId
+    }
+    
+    // 或者更好的方式：添加getProjectId()方法（如果前端使用projectId字段）
+    public Long getProjectId() {
+        return this.projectId;
     }
 
 }

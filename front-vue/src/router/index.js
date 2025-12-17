@@ -14,18 +14,29 @@ const routes = [
     name: 'HrmLayout',
     component: () => import('@/views/HrmLayout.vue')
   },
+<<<<<<< HEAD
 
-  // 系统管理员
   {
-    path: '/admin/user-role',
-    component: () => import('@/views/admin/UserRoleManagement.vue'),
-    meta: { 
-      title: '员工角色管理',
-      requiresAuth: true,
-      roles: [1]
-    }
+    path:'/salary/manage',
+    name: 'SalaryManage',
+    component: () => import('@/views/salary/Manage.vue'),
+    meta: { title: '薪酬管理', requiresAuth: true }
+    
   },
 
+{
+  path: '/salary/projects',
+  name: 'SalaryProjectList',
+  component: () => import('@/views/salary/SalaryProjectList.vue'),
+  meta: { title: '薪酬项目管理', requiresAuth: true }
+},
+{
+  path: '/salary/projects/create',
+  name: 'SalaryProjectCreate',
+  component: () => import('@/views/salary/SalaryProjectCreate.vue'),
+  meta: { title: '创建薪酬项目', requiresAuth: true }
+}
+=======
   {
     path: '/hr/archive',
     component: () => import('@/views/archive/ArchiveLayout.vue'),
@@ -63,49 +74,16 @@ const routes = [
           roles: [4]
         }
       },
-      {
-        path: 'my-archives',
-        name: 'MyArchives',
-        component: () => import('@/views/archive/MyArchives.vue'),
-        meta: {
-          roles: [4]
-        }
-      },
       { path: 'staff-change',
         name: 'StaffChange',
         component: () => import('@/views/archive/StaffChange.vue'),
         meta: {
           roles: [4]
         }
-      },
-      {
-        path: 'staff-change/:id',
-        name: 'StaffChangeWithId',
-        component: () => import('@/views/archive/StaffChange.vue'),
-        meta: {
-          roles: [4]
-        }
-      },
-      {
-        path: 'my-change-records',
-        name: 'MyChangeRecords',
-        component: () => import('@/views/archive/MyChangeRecords.vue'),
-        meta: {
-          roles: [4]
-        }
-      },
-
-      // 档案查询页面（人事专员和经理都可以访问）
-      {
-        path: 'archive-query',
-        name: 'ArchiveQuery',
-        component: () => import('@/views/archive/ArchiveQuery.vue'),
-        meta: {
-          roles: [2, 4] // 人事经理和人事专员都可以访问
-        }
       }
     ]
   }
+>>>>>>> 299f4a6d61439963b166b87416c7c18adb26ce7d
 ]
 
 const router = new VueRouter({
