@@ -6,6 +6,7 @@ import org.example.hrm.dto.ArchiveQueryDTO;
 import org.example.hrm.dto.ReviewDTO;
 import org.example.hrm.entity.Archive;
 import org.example.hrm.entity.ArchiveOperation;
+import org.example.hrm.entity.ArchiveStandard;
 import org.example.hrm.entity.Organization;
 import org.example.hrm.entity.User;
 import org.example.hrm.exception.BusinessException;
@@ -17,16 +18,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-
 import javax.persistence.criteria.Predicate;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -44,6 +49,12 @@ public class ArchiveService {
 
   @Autowired
   private UserRepository userRepository;
+
+  @Autowired
+  private PasswordEncoder passwordEncoder;
+
+  @Autowired
+  private ArchiveSalaryService archiveSalaryService;
 
   // 生成档案编码
   private String generateArcCode(Long thirdOrgId) {
@@ -208,6 +219,14 @@ public class ArchiveService {
       archive.setReviewId(reviewerId);
       archive.setReason(null); // 清除驳回原因
 
+      // 自动生成用户账号
+      try {
+        User createdUser = createUserFromArchive(archive);
+        log.info("档案审核通过，已自动创建用户账号: {}", createdUser.getUserCode());
+      } catch (Exception e) {
+        log.error("自动创建用户账号失败，档案ID: {}", archive.getArcId(), e);
+      }
+
       // 记录操作日志（审核通过）
       recordArchiveOperation(archive.getArcId(), reviewerId, 2,
           "审核通过" + (StringUtils.hasText(reviewDTO.getComment()) ? "，备注：" + reviewDTO.getComment() : ""),
@@ -279,8 +298,43 @@ public class ArchiveService {
     // 记录操作日志（删除）
     recordArchiveOperation(arcId, userId, 0, "删除档案", null);
 
-    log.info("用户 {} 删除档案 {}，档案编码：{}", userId, arcId, archive.getArcCode());
-    return archiveRepository.save(archive);
+    Archive savedArchive = archiveRepository.save(archive);
+
+    // 重要：同步更新关联用户状态为离职
+    updateUserStatusWhenArchiveDeleted(arcId);
+
+    log.info("用户 {} 删除档案 {}，档案编码：{}，同步更新用户状态为离职",
+        userId, arcId, archive.getArcCode());
+    return savedArchive;
+  }
+
+  // 同步更新用户状态为离职（当档案被删除时）
+  private void updateUserStatusWhenArchiveDeleted(Long arcId) {
+    try {
+      // 查找关联的用户
+      Optional<User> userOptional = userRepository.findByArchiveId(arcId);
+
+      if (userOptional.isPresent()) {
+        User user = userOptional.get();
+
+        // 只有当前状态为在职的用户才需要更新
+        if (user.getStatus() != null && user.getStatus() == 1) {
+          user.setStatus(0); // 离职
+          user.setLeaveDate(LocalDate.now()); // 设置离职时间为今天
+          user.setUpdateTime(LocalDateTime.now());
+
+          userRepository.save(user);
+
+          log.info("档案 {} 被删除，同步更新关联用户 {} (工号: {}) 状态为离职，离职时间: {}",
+              arcId, user.getUserName(), user.getUserCode(), LocalDate.now());
+        }
+      } else {
+        log.warn("档案 {} 没有关联的用户，跳过用户状态更新", arcId);
+      }
+    } catch (Exception e) {
+      log.error("更新用户状态失败，档案ID: {}", arcId, e);
+      // 这里不抛出异常，避免影响档案删除的主流程
+    }
   }
 
   // 恢复已删除的档案
@@ -302,8 +356,43 @@ public class ArchiveService {
     // 记录操作日志（恢复）
     recordArchiveOperation(arcId, userId, 5, "恢复档案", null);
 
-    log.info("用户 {} 恢复档案 {}，档案编码：{}", userId, arcId, archive.getArcCode());
-    return archiveRepository.save(archive);
+    Archive savedArchive = archiveRepository.save(archive);
+
+    // 重要：同步更新关联用户状态为在职
+    updateUserStatusWhenArchiveRestored(arcId);
+
+    log.info("用户 {} 恢复档案 {}，档案编码：{}，同步更新用户状态为在职",
+        userId, arcId, archive.getArcCode());
+    return savedArchive;
+  }
+
+  // 同步更新用户状态为在职（当档案被恢复时）
+  private void updateUserStatusWhenArchiveRestored(Long arcId) {
+    try {
+      // 查找关联的用户
+      Optional<User> userOptional = userRepository.findByArchiveId(arcId);
+
+      if (userOptional.isPresent()) {
+        User user = userOptional.get();
+
+        // 只有当用户状态为离职时才需要恢复
+        if (user.getStatus() != null && user.getStatus() == 0) {
+          user.setStatus(1); // 在职
+          user.setLeaveDate(null); // 清空离职时间
+          user.setUpdateTime(LocalDateTime.now());
+
+          userRepository.save(user);
+
+          log.info("档案 {} 被恢复，同步更新关联用户 {} (工号: {}) 状态为在职，清空离职时间",
+              arcId, user.getUserName(), user.getUserCode());
+        }
+      } else {
+        log.warn("档案 {} 没有关联的用户，跳过用户状态更新", arcId);
+      }
+    } catch (Exception e) {
+      log.error("更新用户状态失败，档案ID: {}", arcId, e);
+      // 这里不抛出异常，避免影响档案恢复的主流程
+    }
   }
 
   // 获取档案详情
@@ -481,15 +570,20 @@ public class ArchiveService {
         predicates.add(cb.lessThanOrEqualTo(root.get("createTime"), queryDTO.getCreateTimeEnd()));
       }
 
-      // 排除已删除的档案
-      predicates.add(cb.notEqual(root.get("status"), 0));
+      // 如果明确查询状态为0的档案，就不应该排除
+      if (queryDTO.getStatus() == null) {
+        // 只有未指定状态时才排除已删除的档案
+        predicates.add(cb.notEqual(root.get("status"), 0));
+      }
+      // 如果queryDTO.getStatus() == 0，则查询已删除的档案
+      // 如果queryDTO.getStatus() != 0，则查询指定状态的档案
 
       return cb.and(predicates.toArray(new Predicate[0]));
     };
   }
 
   // 补充机构名称
-  private void enrichArchiveWithOrgNames(Archive archive) {
+  public void enrichArchiveWithOrgNames(Archive archive) {
     try {
       Organization firstOrg = organizationRepository.findById(archive.getFirstOrgId()).orElse(null);
       if (firstOrg != null) {
@@ -511,7 +605,7 @@ public class ArchiveService {
   }
 
   // 补充人员姓名
-  private void enrichArchiveWithUserNames(Archive archive) {
+  public void enrichArchiveWithUserNames(Archive archive) {
     try {
       User writer = userRepository.findById(archive.getWriteId()).orElse(null);
       if (writer != null) {
@@ -580,4 +674,136 @@ public class ArchiveService {
     });
     return archives;
   }
+
+  // 自动生成用户账号
+  private User createUserFromArchive(Archive archive) {
+    log.info("开始为档案 {} 创建用户账号", archive.getArcId());
+
+    try {
+      // 检查是否已存在相同档案ID的用户
+      Optional<User> existingUser = userRepository.findByArchiveId(archive.getArcId());
+      if (existingUser.isPresent()) {
+        log.warn("档案 {} 已存在对应的用户账号，跳过创建", archive.getArcId());
+        return existingUser.get();
+      }
+
+      // 生成工号：HRM + 6位顺序号
+      String userCode = generateUserCode();
+      log.info("生成的工号: {}", userCode);
+
+      // 创建用户对象
+      User user = new User();
+      user.setUserCode(userCode);
+      user.setUserName(archive.getName());
+      user.setEmail(archive.getEmail());
+      user.setPhone(archive.getPhone());
+      user.setOrgId(archive.getThirdOrgId()); // 使用三级机构ID
+      user.setEntryDate(LocalDate.now()); // 入职时间就是建档成功时间
+      user.setStatus(1); // 在职状态
+
+      // 初始密码为身份证后6位
+      String idCard = archive.getIdCard();
+      String initialPassword = idCard.substring(Math.max(0, idCard.length() - 6));
+      user.setPassword(passwordEncoder.encode(initialPassword));
+
+      // 设置默认角色类型为6（普通员工）
+      user.setRoleType(6);
+
+      // 关联档案ID
+      user.setArchiveId(archive.getArcId());
+
+      // 设置其他信息
+      user.setCreateTime(LocalDateTime.now());
+      user.setUpdateTime(LocalDateTime.now());
+
+      User savedUser = userRepository.save(user);
+
+      log.info("成功创建用户账号: {}, 工号: {}, 初始密码: {}",
+          savedUser.getUserName(), savedUser.getUserCode(), initialPassword);
+
+      return savedUser;
+    } catch (Exception e) {
+      log.error("创建用户账号失败，档案ID: {}", archive.getArcId(), e);
+      throw new BusinessException(ResultCode.BUSINESS_ERROR, "创建用户账号失败: " + e.getMessage());
+    }
+  }
+
+  // 生成用户工号
+  private String generateUserCode() {
+    // 查询最大工号
+    String maxUserCode = userRepository.findMaxUserCode();
+    int nextNum = 1;
+
+    if (maxUserCode != null && maxUserCode.startsWith("HRM")) {
+      try {
+        String numStr = maxUserCode.substring(3);
+        nextNum = Integer.parseInt(numStr) + 1;
+      } catch (NumberFormatException e) {
+        log.warn("解析工号失败，重置为1", e);
+        nextNum = 1;
+      }
+    }
+
+    return String.format("HRM%06d", nextNum);
+  }
+
+  public Page<Archive> queryMyArchives(Map<String, Object> params, int page, int size) {
+    // 构建分页
+    Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime"));
+
+    // 构建查询条件
+    Specification<Archive> spec = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
+
+      // 必须是指定登记人的档案
+      if (params.get("writeId") != null) {
+        predicates.add(cb.equal(root.get("writeId"), params.get("writeId")));
+      }
+
+      // 档案编号模糊查询
+      if (params.get("arcCode") != null) {
+        predicates.add(cb.like(root.get("arcCode"), "%" + params.get("arcCode") + "%"));
+      }
+
+      // 姓名模糊查询
+      if (params.get("name") != null) {
+        predicates.add(cb.like(root.get("name"), "%" + params.get("name") + "%"));
+      }
+
+      // 职位模糊查询
+      if (params.get("positionName") != null) {
+        predicates.add(cb.like(root.get("positionName"), "%" + params.get("positionName") + "%"));
+      }
+
+      // 状态查询
+      if (params.get("status") != null) {
+        predicates.add(cb.equal(root.get("status"), params.get("status")));
+      }
+
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
+
+    return archiveRepository.findAll(spec, pageable);
+  }
+
+  // 获取薪酬标准
+  public List<Map<String, Object>> getSalaryStandardsByPositionAndTitle(Long positionId, String title) {
+    try {
+        List<ArchiveStandard> standards = archiveSalaryService.getStandardsByPositionAndTitle(positionId, title);
+        
+        return standards.stream()
+            .map(standard -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("standardId", standard.getStandardId());
+                map.put("standardCode", standard.getStandardCode());
+                map.put("standardName", standard.getStandardName());
+                map.put("status", standard.getStatus());
+                return map;
+            })
+            .collect(Collectors.toList());
+    } catch (Exception e) {
+        log.error("获取薪酬标准失败", e);
+        return new ArrayList<>();
+    }
+}
 }

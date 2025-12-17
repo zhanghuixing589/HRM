@@ -5,18 +5,13 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class ArchiveQueryDTO {
-  private String name;
-  private String idCard;
+public class ArchiveChangeQueryDTO {
+  private String archiveName;
+  private String archiveCode;
   private Integer status;
-  private Long writeId;
+  private Long applyId;
   private Long reviewId;
-  private Long firstOrgId;
-  private Long secondOrgId;
-  private Long thirdOrgId;
-  private String arcCode;
-  private String positionName;
-
+  private String changeReason;
 
   @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
   private LocalDateTime createTimeStart;

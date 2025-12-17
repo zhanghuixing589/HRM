@@ -41,4 +41,7 @@ public interface PositionRepository extends JpaRepository<Position, Long> {
   // 分页查询根据机构ID列表
   @Query("SELECT p FROM Position p WHERE p.orgId IN :orgIds")
   Page<Position> findByOrgIds(@Param("orgIds") List<Long> orgIds, Pageable pageable);
+
+  @Query("SELECT p FROM Position p WHERE p.posName LIKE %:keyword%")
+  List<Position> findByPosNameLike(@Param("keyword") String keyword);
 }

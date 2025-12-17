@@ -11,12 +11,6 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   config => { 
-    // 从本地存储获取登录令牌
-    // const token = localStorage.getItem('token');
-    // if (token) {  // 成功获取则将其添加到请求头
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
-    // 从本地存储获取登录令牌
     let token = localStorage.getItem('token');
     if (token) {
       token = token.trim();

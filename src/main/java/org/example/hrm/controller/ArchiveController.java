@@ -9,6 +9,7 @@ import org.example.hrm.dto.ReviewDTO;
 import org.example.hrm.entity.Archive;
 import org.example.hrm.entity.ArchiveOperation;
 import org.example.hrm.exception.BusinessException;
+import org.example.hrm.service.ArchiveChangeService;
 import org.example.hrm.service.ArchiveService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,8 +17,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +33,9 @@ public class ArchiveController {
 
   @Autowired
   private ArchiveService archiveService;
+
+  @Autowired
+  private ArchiveChangeService archiveChangeService;
 
   /**
    * 登记档案（人事专员）
@@ -93,7 +100,7 @@ public class ArchiveController {
    * 删除档案（标记删除）
    */
   @DeleteMapping("/{arcId}")
-  @PreAuthorize("hasRole('HR_MANAGER')")
+  // @PreAuthorize("hasRole('HR_MANAGER')")
   public Result<String> deleteArchive(@PathVariable Long arcId,
       @RequestAttribute Long userId) {
     try {
@@ -112,7 +119,7 @@ public class ArchiveController {
    * 恢复已删除的档案
    */
   @PutMapping("/restore/{arcId}")
-  @PreAuthorize("hasRole('HR_MANAGER')")
+  // @PreAuthorize("hasRole('HR_MANAGER')")
   public Result<Archive> restoreArchive(@PathVariable Long arcId,
       @RequestAttribute Long userId) {
     try {
@@ -173,6 +180,81 @@ public class ArchiveController {
   }
 
   /**
+   * GET方式查询档案（支持分页和筛选）
+   */
+  @GetMapping("/query-list")
+  @PreAuthorize("hasRole('HR_SPECIALIST') or hasRole('HR_MANAGER')")
+  public Result<PageResult<Archive>> queryArchivesGet(
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) Long firstOrgId,
+      @RequestParam(required = false) Long secondOrgId,
+      @RequestParam(required = false) Long thirdOrgId,
+      @RequestParam(required = false) String name,
+      @RequestParam(required = false) String arcCode,
+      @RequestParam(required = false) String idCard,
+      @RequestParam(required = false) String positionName,
+      @RequestParam(required = false) String createTimeStart,
+      @RequestParam(required = false) String createTimeEnd,
+      @RequestParam(required = false) Long writeId,
+      @RequestParam(required = false) Long reviewId,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "10") int size) {
+    try {
+      // 构建查询DTO
+      ArchiveQueryDTO queryDTO = new ArchiveQueryDTO();
+      queryDTO.setStatus(status);
+      queryDTO.setFirstOrgId(firstOrgId);
+      queryDTO.setSecondOrgId(secondOrgId);
+      queryDTO.setThirdOrgId(thirdOrgId);
+      queryDTO.setName(name);
+      queryDTO.setArcCode(arcCode);
+      queryDTO.setIdCard(idCard);
+      queryDTO.setPositionName(positionName);
+      queryDTO.setWriteId(writeId);
+      queryDTO.setReviewId(reviewId);
+      queryDTO.setPage(page);
+      queryDTO.setSize(size);
+
+      // 处理时间参数
+      if (createTimeStart != null) {
+        try {
+          LocalDateTime startTime = LocalDateTime.parse(createTimeStart + "T00:00:00");
+          queryDTO.setCreateTimeStart(startTime);
+        } catch (Exception e) {
+          // 如果解析失败，忽略时间参数
+          log.warn("创建时间开始参数解析失败: {}", createTimeStart);
+        }
+      }
+
+      if (createTimeEnd != null) {
+        try {
+          LocalDateTime endTime = LocalDateTime.parse(createTimeEnd + "T23:59:59");
+          queryDTO.setCreateTimeEnd(endTime);
+        } catch (Exception e) {
+          // 如果解析失败，忽略时间参数
+          log.warn("创建时间结束参数解析失败: {}", createTimeEnd);
+        }
+      }
+
+      PageRequest pageable = PageRequest.of(
+          page, size, Sort.by(Sort.Direction.DESC, "createTime"));
+
+      Page<Archive> pageResult = archiveService.queryArchives(queryDTO, pageable);
+
+      PageResult<Archive> result = PageResult.success(
+          pageResult.getNumber(),
+          pageResult.getSize(),
+          pageResult.getTotalElements(),
+          pageResult.getContent());
+
+      return Result.success(result);
+    } catch (Exception e) {
+      log.error("查询档案失败", e);
+      return Result.error(ResultCode.ERROR, "查询档案失败: " + e.getMessage());
+    }
+  }
+
+  /**
    * 获取待复核档案列表
    */
   @GetMapping("/pending-review")
@@ -218,17 +300,58 @@ public class ArchiveController {
   }
 
   /**
-   * 获取当前用户登记的档案
-   */
-  @GetMapping("/my-archives")
-  @PreAuthorize("hasRole('HR_SPECIALIST') or hasRole('HR_MANAGER')")
-  public Result<List<Archive>> getMyArchives(@RequestAttribute Long userId) {
-    try {
-      List<Archive> archives = archiveService.getArchivesByWriter(userId);
-      return Result.success(archives);
-    } catch (Exception e) {
-      log.error("获取用户档案失败", e);
-      return Result.error(ResultCode.ERROR, "获取用户档案失败");
+ * 获取我的档案提交记录（支持分页和条件查询）
+ */
+@GetMapping("/my-archives")
+@PreAuthorize("hasRole('HR_SPECIALIST') or hasRole('HR_MANAGER')")
+public Result<PageResult<Archive>> getMyArchives(
+    @RequestParam(required = false) String arcCode,
+    @RequestParam(required = false) String name,
+    @RequestParam(required = false) String positionName,
+    @RequestParam(required = false) Integer status,
+    @RequestAttribute Long userId,
+    @RequestParam(defaultValue = "0") int page,
+    @RequestParam(defaultValue = "10") int size) {
+
+  try {
+    // 构建查询参数
+    Map<String, Object> params = new HashMap<>();
+    params.put("writeId", userId);
+
+    if (StringUtils.hasText(arcCode)) {
+      params.put("arcCode", arcCode);
     }
+    if (StringUtils.hasText(name)) {
+      params.put("name", name);
+    }
+    if (StringUtils.hasText(positionName)) {
+      params.put("positionName", positionName);
+    }
+    if (status != null) {
+      params.put("status", status);
+    }
+
+    Page<Archive> pageResult = archiveService.queryMyArchives(params, page, size);
+
+    // 重要：补充机构名称和用户名称
+    List<Archive> archives = pageResult.getContent();
+    for (Archive archive : archives) {
+      // 补充机构名称
+      archiveService.enrichArchiveWithOrgNames(archive);
+      // 补充用户名称
+      archiveService.enrichArchiveWithUserNames(archive);
+    }
+
+    PageResult<Archive> result = PageResult.success(
+        pageResult.getNumber(),
+        pageResult.getSize(),
+        pageResult.getTotalElements(),
+        archives);
+
+    return Result.success(result);
+  } catch (Exception e) {
+    log.error("获取用户档案失败", e);
+    return Result.error(ResultCode.ERROR, "获取用户档案失败");
   }
+}
 }
