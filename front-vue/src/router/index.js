@@ -1,5 +1,7 @@
+
 import Vue from 'vue'
 import VueRouter from 'vue-router'
+
 
 Vue.use(VueRouter)
 
@@ -89,8 +91,26 @@ const routes = [
   meta: {
     title: '审核历史记录',
     requireAuth: true,
-    roles: [1, 3, 5] // HR_MANAGER, FINANCE_MANAGER, SALARY_SPECIALIST
+    roles: [1, 3, 5] // HR_MANAGER, FINANCE_MANAGER, 
   }
+},
+
+{
+  path:'/salary/Payment',
+  name: 'SalaryPayment',
+  component: () => import('@/views/salary/SalaryPayment.vue'),
+  meta: { title: '薪酬发放', requiresAuth: true,
+       roles: [1,3,5]
+     }
+},
+
+{
+  path:'/salary/Payment',
+  name: 'SalaryPaymentCreate',
+  component: () => import('@/views/salary/SalaryPaymentCreate.vue'),
+  meta: { title: '薪酬发放表单', requiresAuth: true,
+       roles: [1,3,5]
+     }
 },
 
   {
