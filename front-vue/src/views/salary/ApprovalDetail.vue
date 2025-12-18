@@ -23,6 +23,7 @@
             </el-tag>
             <span class="standard-code">{{ detailData.standardCode }}</span>
             <span class="standard-name">{{ detailData.standardName }}</span>
+            <span class="standard-name">{{ currentApproval.approverName || '薪酬经理' }}</span>
           </div>
         </div>
         <div class="header-actions">
@@ -33,7 +34,7 @@
       </div>
 
       <!-- 审核信息卡片 -->
-      <el-card class="approval-info-card">
+    <!--   <el-card class="approval-info-card">
         <div slot="header" class="card-header">
           <span>审核信息</span>
         </div>
@@ -85,7 +86,7 @@
             show-icon
           />
         </div>
-      </el-card>
+      </el-card> -->
 
       <!-- 标准详情卡片 -->
       <el-card class="standard-detail-card">
@@ -415,6 +416,11 @@ export default {
   },
   
   computed: {
+     // 安全访问 currentApproval
+  currentApproval() {
+    return this.detailData?.currentApproval || {}
+  },
+  
     // 排序后的日志（按时间倒序）
     sortedLogs() {
       if (!this.detailData || !this.detailData.approvalLogs) {
@@ -502,7 +508,13 @@ export default {
       } catch (error) {
         console.error('加载审核详情失败:', error)
         this.$message.error('加载审核详情失败: ' + error.message)
-        this.$router.push('/salary/standards')
+         // **修复：使用 .catch() 忽略 NavigationDuplicated 错误**
+    this.$router.push('/salary/standards').catch(err => {
+      // 忽略重复导航错误，其他错误继续抛出
+      if (err.name !== 'NavigationDuplicated') {
+        throw err;
+      }
+    })
       } finally {
         this.loading = false
       }

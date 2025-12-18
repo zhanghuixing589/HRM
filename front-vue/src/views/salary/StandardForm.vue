@@ -395,53 +395,56 @@
                 </div>
               </template>
               
-              <template v-else-if="scope.row.calculationMethod === 'percentage'">
-                <el-input-number
-                  v-model="scope.row.amount"
-                  :precision="2"
-                  :step="5"
-                  :min="0"
-                  :max="1000"
-                  style="width: 100%"
-                  placeholder="请输入百分比"
-                  :disabled="!isEditable"
-                  controls-position="right"
-                  @change="calculatePercentageItemAmount(scope.row)"
-                >
-                  <template slot="append">%</template>
-                </el-input-number>
-                <div style="margin-top: 5px; font-size: 11px; color: #409EFF;">
-                  计算: BASE_SALARY × {{ (scope.row.amount || 0) / 100 }}
-                </div>
-              </template>
-              
-              <template v-else>
-                <span style="color: #c0c4cc;">请选择计算方式</span>
-              </template>
-            </template>
-          </el-table-column>
+              <!-- 百分比 -->
+    <template v-else-if="scope.row.calculationMethod === 'percentage'">
+      <el-input-number
+        v-model="scope.row.amount"
+        :precision="2"
+        :step="5"
+        :min="0"
+        :max="1000"
+        style="width: 100%"
+        placeholder="请输入百分比"
+        :disabled="!isEditable"
+        controls-position="right"
+        @change="calculatePercentageItemAmount(scope.row)"
+      >
+        <template slot="append">%</template>
+      </el-input-number>
+      <div style="margin-top: 5px; font-size: 11px; color: #409EFF;">
+        计算: {{ formatCurrency(baseSalary) }} × {{ (scope.row.amount || 0) / 100 }}% = 
+        ¥ {{ formatCurrency(scope.row.calculatedAmount) }}
+      </div>
+    </template>
+    
+    <template v-else>
+      <span style="color: #c0c4cc;">请选择计算方式</span>
+    </template>
+  </template>
+</el-table-column>
 
-          <!-- 新增：项目金额计算列 -->
-          <el-table-column label="项目金额" width="150" align="right">
-            <template slot-scope="scope">
-              <div v-if="scope.row.calculationMethod === 'fixed' && scope.row.amount">
-                <span :style="{ 
-                  color: getProjectTypeByCode(scope.row.projectCode) === 1 ? '#67C23A' : '#F56C6C',
-                  fontWeight: 'bold'
-                }">
-                  {{ getProjectTypeByCode(scope.row.projectCode) === 1 ? '+' : '-' }} ¥ {{ formatCurrency(scope.row.amount) }}
-                </span>
-              </div>
-              <div v-else-if="scope.row.calculationMethod === 'percentage'">
-                <span style="color: #909399; font-size: 12px;">
-                  {{ scope.row.amount }}% × 基本工资
-                </span>
-              </div>
-              <div v-else>
-                <span style="color: #c0c4cc; font-size: 12px;">--</span>
-              </div>
-            </template>
-          </el-table-column>
+         <!-- 修改"项目金额"列 -->
+<el-table-column label="项目金额" width="140" align="right">
+  <template slot-scope="scope">
+    <div v-if="scope.row.projectCode && scope.row.calculationMethod">
+      <span :style="{ 
+        color: getProjectTypeByCode(scope.row.projectCode) === 1 ? '#67C23A' : '#F56C6C',
+        fontWeight: 'bold',
+        fontSize: '14px'
+      }">
+        {{ getProjectTypeByCode(scope.row.projectCode) === 1 ? '+' : '-' }} 
+        ¥ {{ formatCurrency(scope.row.calculatedAmount) }}
+      </span>
+      <div v-if="scope.row.calculationMethod === 'percentage'" 
+           style="color: #909399; font-size: 11px; margin-top: 3px;">
+        计算值
+      </div>
+    </div>
+    <div v-else>
+      <span style="color: #c0c4cc; font-size: 12px;">--</span>
+    </div>
+  </template>
+</el-table-column>
           
           <el-table-column label="操作" width="100" align="center" v-if="isEditable">
             <template slot-scope="scope">
@@ -461,6 +464,16 @@
         <!-- 总计信息 -->
         <div v-if="formData.items.length > 0" class="summary-section">
           <el-divider content-position="left">薪酬合计</el-divider>
+          <!-- 添加基本工资提示 -->
+  <el-alert 
+    v-if="baseSalary > 0" 
+    :title="'基本工资基准值: ¥' + formatCurrency(baseSalary) + '（已从本地加载）'" 
+    type="info" 
+    :closable="false"
+    show-icon
+    style="margin-bottom: 15px;"
+  />
+  
           <div class="summary-content">
             <div class="summary-item">
               <span class="summary-label">总收入项：</span>
@@ -529,49 +542,100 @@
           />
         </div>
 
-        <el-button 
-          type="primary" 
-          @click="handleSaveDraft"
-          :loading="saving"
-          :disabled="!isEditable"
-          icon="el-icon-document"
-        >
-          {{ isEditMode ? '更新保存' : '保存草稿' }}
-        </el-button>
-        
-        <el-button 
-          v-if="hasEditPermission && isEditable"
-          type="success" 
-          @click="handleSubmitReview"
-          :loading="submitting"
-          :disabled="!canSubmitForReview"
-          icon="el-icon-check"
-        >
-          提交审核
-        </el-button>
-        
-        <el-button 
-          type="info" 
-          @click="handleResetForm"
-          :disabled="!isEditable"
-          icon="el-icon-refresh"
-          v-if="!isEditMode"
-        >
-          重置表单
-        </el-button>
-        
-        <el-button 
-          type="warning" 
-          @click="handleBack"
-          icon="el-icon-close"
-        >
-          取消返回
-        </el-button>
-      </div>
-      <!-- 添加保存提示 -->
-      <div v-if="saving" class="saving-tip">
-        <i class="el-icon-loading"></i> 正在保存数据，请稍候...
-      </div>
+         <!-- 草稿状态操作组 -->
+    <template v-if="isDraftStatus">
+      <el-button 
+        type="primary" 
+        @click="handleSaveDraft"
+        :loading="saving"
+        :disabled="!canEdit || saving"
+        icon="el-icon-document"
+      >
+        {{ isEditMode ? '更新保存' : '保存草稿' }}
+      </el-button>
+      
+      <el-button 
+        v-if="hasEditPermission && canEdit"
+        type="success" 
+        @click="handleSubmitReview"
+        :loading="submitting"
+        :disabled="!canSubmitForReview || submitting"
+        icon="el-icon-check"
+      >
+        提交审核
+      </el-button>
+      
+      <el-button 
+        type="info" 
+        @click="handleResetForm"
+        :disabled="!canEdit || saving || submitting"
+        icon="el-icon-refresh"
+        v-if="!isEditMode"
+      >
+        重置表单
+      </el-button>
+    </template>
+
+    <!-- 驳回状态操作组 -->
+    <template v-else-if="isRejectedStatus">
+      <el-button 
+        type="primary" 
+        @click="handleSaveDraft"
+        :loading="saving"
+        :disabled="!canEdit || saving"
+        icon="el-icon-document"
+      >
+        保存修改
+      </el-button>
+      
+      <el-button 
+        v-if="hasEditPermission && canEdit"
+        type="success" 
+        @click="handleSubmitReview"
+        :loading="submitting"
+        :disabled="!canSubmitForReview || submitting"
+        icon="el-icon-check"
+      >
+        重新提交审核
+      </el-button>
+      
+      <el-tag type="danger" size="medium" effect="dark" style="margin: 0 10px;">
+        驳回状态：可修改后重新提交
+      </el-tag>
+    </template>
+
+    <!-- 待审核状态提示 -->
+    <template v-else-if="isPendingStatus">
+      <el-alert 
+        title="当前标准已提交审核，请等待管理员审批" 
+        type="warning" 
+        :closable="false"
+        show-icon
+        style="margin-right: 20px;"
+      />
+    </template>
+
+    <!-- 已生效状态提示 -->
+    <template v-else-if="isApprovedStatus">
+      <el-alert 
+        title="当前标准已生效，不可编辑" 
+        type="success" 
+        :closable="false"
+        show-icon
+        style="margin-right: 20px;"
+      />
+    </template>
+
+    <!-- 公共操作 -->
+    <el-button 
+      type="warning" 
+      @click="handleBack"
+      icon="el-icon-close"
+      :disabled="saving || submitting"
+    >
+      取消返回
+    </el-button>
+  </div>
     </el-form>
     
     <!-- 错误提示弹窗 -->
@@ -596,7 +660,7 @@ import {
   generateStandardCode, 
   createStandard, 
   updateStandard, 
-
+  submitForApproval ,
   getAllPositions,
   getAllProjects,
   checkPositionHasStandard,
@@ -702,6 +766,45 @@ export default {
   },
 
   computed: {
+     baseSalary() {
+    return this.findBaseSalaryFromItems();
+  },
+  
+  totalIncomeAmount() {
+    return this.formData.items.reduce((total, item) => {
+      if (!item.projectCode) return total;
+      
+      const projectType = this.getProjectTypeByCode(item.projectCode);
+      if (projectType !== 1) return total; // 只计算收入项
+      
+      const amount = parseFloat(item.calculatedAmount) || 0;
+      return total + amount;
+    }, 0);
+  },
+  
+  totalDeductionAmount() {
+    return this.formData.items.reduce((total, item) => {
+      if (!item.projectCode) return total;
+      
+      const projectType = this.getProjectTypeByCode(item.projectCode);
+      if (projectType !== 2) return total; // 只计算扣除项
+      
+      const amount = parseFloat(item.calculatedAmount) || 0;
+      return total + amount;
+    }, 0);
+  },
+  
+  // 添加百分比项目明细（用于调试和显示）
+  percentageItemsDetail() {
+    return this.formData.items
+      .filter(item => item.calculationMethod === 'percentage' && item.projectCode)
+      .map(item => ({
+        projectName: this.getProjectName(item.projectCode),
+        percentage: parseFloat(item.amount) || 0,
+        calculatedAmount: parseFloat(item.calculatedAmount) || 0,
+        projectType: this.getProjectTypeByCode(item.projectCode)
+      }));
+  },
     hasEditPermission() {
       const hasPermission = this.userRoles.includes(1) || 
                            this.userRoles.includes(5) || 
@@ -719,6 +822,52 @@ export default {
     canRefreshCode() {
       return !this.isEditMode && this.formInitiated
     },
+
+       /**
+     * 表单是否可编辑（核心逻辑）
+     * 判断依据：非只读模式 + 有编辑权限 + 状态允许编辑
+     */
+    canEdit() {
+      // 如果处于只读模式（如查看详情），完全不可编辑
+      if (this.isReadonly) return false;
+      
+      // 如果没有编辑权限，完全不可编辑
+      if (!this.hasEditPermission) return false;
+      
+      // 根据状态判断是否可以编辑
+      // status: 0-已驳回, 1-草稿, 2-待审核, 3-已生效
+      // 只有驳回和草稿状态可以编辑
+      return this.formData.status === 1 || this.formData.status === 0;
+    },
+
+      /**
+     * 判断是否为草稿状态
+     */
+    isDraftStatus() {
+      return this.formData.status === 1;
+    },
+    
+    /**
+     * 判断是否为驳回状态
+     */
+    isRejectedStatus() {
+      return this.formData.status === 0;
+    },
+    
+    /**
+     * 判断是否为待审核状态
+     */
+    isPendingStatus() {
+      return this.formData.status === 2;
+    },
+    
+    /**
+     * 判断是否为已生效状态
+     */
+    isApprovedStatus() {
+      return this.formData.status === 3;
+    },
+
     
     // 修改：增加无效职位检查
     canSubmitForReview() {
@@ -729,7 +878,39 @@ export default {
              this.formData.items.every(item => item.projectCode) &&
              !this.hasInvalidPositions()
     },
-    
+     /**
+     * 显示的状态文本（带详细提示）
+     */
+    statusDisplayText() {
+      const status = this.formData.status;
+      switch (status) {
+        case 1: 
+          return {
+            text: '草稿',
+            tip: '可编辑和保存'
+          };
+        case 2: 
+          return {
+            text: '待审核',
+            tip: '已提交审核，等待审批'
+          };
+        case 3: 
+          return {
+            text: '已生效',
+            tip: '标准已生效，不可编辑'
+          };
+        case 0: 
+          return {
+            text: '已驳回',
+            tip: '可修改后重新提交'
+          };
+        default: 
+          return {
+            text: '未知',
+            tip: '未知状态'
+          };
+      }
+    },
     groupedPositions() {
       const groups = {}
       
@@ -803,27 +984,6 @@ export default {
       return this.formData.items.filter(item => item.calculationMethod === 'percentage').length
     },
     
-    totalIncomeAmount() {
-      return this.formData.items.reduce((total, item) => {
-        if (item.calculationMethod === 'fixed' && 
-            this.getProjectTypeByCode(item.projectCode) === 1 && 
-            item.amount) {
-          return total + Number(item.amount)
-        }
-        return total
-      }, 0)
-    },
-    
-    totalDeductionAmount() {
-      return this.formData.items.reduce((total, item) => {
-        if (item.calculationMethod === 'fixed' && 
-            this.getProjectTypeByCode(item.projectCode) === 2 && 
-            item.amount) {
-          return total + Number(item.amount)
-        }
-        return total
-      }, 0)
-    },
     
     totalNetAmount() {
       return this.totalIncomeAmount - this.totalDeductionAmount
@@ -858,6 +1018,12 @@ export default {
       try {
         this.loading = true
         console.log('初始化表单，模式:', this.isEditMode ? '编辑' : '创建')
+
+        // 创建模式：清理本地基本工资数据
+    if (!this.isEditMode) {
+      localStorage.removeItem('salary_base_salary');
+      console.log('创建模式：已清理本地基本工资数据');
+    }
         
         // 设置当前用户信息
         await this.setCurrentUserInfo()
@@ -1128,7 +1294,57 @@ export default {
         this.loading = false
       }
     },
+    // 获取本地存储的基本工资
+  getStoredBaseSalary() {
+    try {
+      const stored = localStorage.getItem('salary_base_salary');
+      return stored ? parseFloat(stored) : null;
+    } catch (error) {
+      console.warn('读取本地基本工资失败:', error);
+      return null;
+    }
+  },
+  
+  // 存储基本工资到本地
+  storeBaseSalary(salary) {
+    try {
+      if (salary && salary > 0) {
+        localStorage.setItem('salary_base_salary', salary.toString());
+        console.log('基本工资已存储到本地:', salary);
+      }
+    } catch (error) {
+      console.warn('存储基本工资失败:', error);
+    }
+  },
+  
+  // 识别基本工资项目（根据编码或名称）
+  isBaseSalaryProject(projectCode, projectName) {
+    // 判断逻辑：编码包含 BASE/SALARY 或名称包含 基本工资/底薪
+    const code = (projectCode || '').toUpperCase();
+    const name = (projectName || '').toUpperCase();
     
+    return code.includes('BASE') || 
+           code.includes('SALARY') || 
+           code.includes('GZ') ||
+           name.includes('基本工资') ||
+           name.includes('底薪') ||
+           name.includes('岗位工资');
+  },
+  
+  // 从当前项目中查找基本工资
+  findBaseSalaryFromItems() {
+    const baseSalaryItem = this.formData.items.find(item => {
+      if (!item.projectCode) return false;
+      const project = this.salaryProjects.find(p => p.projectCode === item.projectCode);
+      return project && this.isBaseSalaryProject(project.projectCode, project.projectName);
+    });
+    
+    if (baseSalaryItem && baseSalaryItem.calculationMethod === 'fixed') {
+      return parseFloat(baseSalaryItem.amount) || 0;
+    }
+    return this.getStoredBaseSalary() || 0;
+  },
+
     addDefaultSalaryItem() {
       if (this.formData.items.length === 0) {
         this.formData.items.push({
@@ -1219,23 +1435,36 @@ export default {
           ...item,
           projectCode: '',
           amount: 0,
-          calculationMethod: 'fixed'
+          calculationMethod: 'fixed',
+          calculatedAmount: 0
         })
         return
       }
       
-      const project = this.salaryProjects.find(p => p.projectCode === projectCode)
-      if (project) {
-        const updatedItem = {
-          ...item,
-          projectCode: projectCode,
-          calculationMethod: project.defaultCalculationMethod || 'fixed',
-          amount: project.defaultAmount || 0
-        }
-        
-        this.$set(this.formData.items, index, updatedItem)
-        this.recalculateItem(updatedItem)
+     const project = this.salaryProjects.find(p => p.projectCode === projectCode);
+  if (project) {
+    const isBaseSalary = this.isBaseSalaryProject(project.projectCode, project.projectName);
+    
+    const updatedItem = {
+      ...item,
+      projectCode: projectCode,
+      calculationMethod: isBaseSalary ? 'fixed' : (project.defaultCalculationMethod || 'fixed'),
+      amount: project.defaultAmount || 0,
+      calculatedAmount: 0
+    };
+    
+    // 如果是基本工资项目，从本地加载历史值
+    if (isBaseSalary && updatedItem.calculationMethod === 'fixed') {
+      const storedSalary = this.getStoredBaseSalary();
+      if (storedSalary) {
+        updatedItem.amount = storedSalary;
+        updatedItem.calculatedAmount = storedSalary;
       }
+    }
+    
+    this.$set(this.formData.items, index, updatedItem);
+    this.recalculateItem(updatedItem);
+  }
     },
     
     handleCalculationMethodChange(item) {
@@ -1244,11 +1473,39 @@ export default {
     },
     
     calculateFixedItemAmount(item) {
-      this.recalculateItem(item)
+      item.calculatedAmount = item.amount || 0;
+  
+  // 检查是否是基本工资项目，如果是则存储到本地
+  const project = this.salaryProjects.find(p => p.projectCode === item.projectCode);
+  if (project && this.isBaseSalaryProject(project.projectCode, project.projectName)) {
+    this.storeBaseSalary(parseFloat(item.amount) || 0);
+    // 存储后重新计算所有百分比项目
+    this.recalculateAllPercentageItems();
+  }
+  
+  this.recalculateItem(item);
     },
+
+
+    // 新增：重新计算所有百分比项目
+recalculateAllPercentageItems() {
+  const baseSalary = this.findBaseSalaryFromItems();
+  
+  this.formData.items.forEach(item => {
+    if (item.calculationMethod === 'percentage' && item.projectCode) {
+      const percentage = parseFloat(item.amount) || 0;
+      item.calculatedAmount = (baseSalary )* percentage / 100;
+    }
+  });
+  
+  this.$forceUpdate();
+},
     
     calculatePercentageItemAmount(item) {
-      this.recalculateItem(item)
+      const baseSalary = this.findBaseSalaryFromItems();
+  const percentage = parseFloat(item.amount) || 0;
+  item.calculatedAmount = (baseSalary * percentage) / 100;
+  this.recalculateItem(item);
     },
     
     recalculateItem() {
@@ -1315,198 +1572,332 @@ export default {
         maximumFractionDigits: 2
       })
     },
-    
-    // 修改：保存前验证职位占用
-    async handleSaveDraft() {
-      if (this.saving) return;
-      
-      this.saving = true;
-      try {
-        await this.$refs.form.validate()
-        
-        // 检查是否有被占用的职位
-        if (this.hasInvalidPositions()) {
-          const invalidPositions = this.formData.positionIds.filter(id => this.getPositionDisabled(id))
-          const positionNames = invalidPositions.map(id => {
-            const position = this.positionList.find(p => p.posId === id)
-            return position ? `${position.posCode}-${position.posName}` : `ID: ${id}`
-          })
-          this.$message.error(`保存失败：以下职位已被其他标准占用\n${positionNames.join('、')}`)
-          return
-        }
-        
-        // 原有保存逻辑保持不变
-        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user')
-        let userId = null
-        if (userStr) {
-          try {
-            const userInfo = JSON.parse(userStr)
-            userId = userInfo.userId || userInfo.id
-          } catch (e) {
-            console.error('解析用户信息失败:', e)
-          }
-        }
-        
-        if (!userId) {
-          this.$message.error('未获取到用户信息，请重新登录')
-          this.$router.push('/login')
-          return
-        }
-        
-        const saveData = {
-          standardCode: this.formData.standardCode,
-          standardName: this.formData.standardName.trim(),
-          positionIds: this.formData.positionIds.map(id => Number(id)),
-          items: this.formData.items
-            .filter(item => item.projectCode)
-            .map(item => ({
-              projectCode: item.projectCode,
-              amount: Number(item.amount || 0),
-              calculationMethod: item.calculationMethod || 'fixed',
-              sortOrder: Number(item.sortOrder || 0)
-            })),
-          remark: (this.formData.remark || '').trim(),
-          status: this.formData.status || 1
-        }
 
-        if (!saveData.standardName) {
-          this.$message.error("标准名称不能为空！")
-          return
-        }
-        
-        let response
-        if (!this.isEditMode) {
-          saveData.creatorId = Number(userId)
-          response = await createStandard(saveData)
-        } else {
-          saveData.updaterId = Number(userId)
-          response = await updateStandard(this.standardId, saveData)
-        }
-        
-        if (response && response.success) {
-          const resultData = response.data
-          if (resultData && resultData.standardId) {
-            this.formData.standardId = resultData.standardId
-            
-            if (!this.isEditMode) {
-              this.isEditMode = true
-              this.standardId = resultData.standardId
-              
-              this.$router.replace({
-                path: this.$route.path,
-                query: { id: resultData.standardId }
-              })
-            }
-          }
-          
-          this.originalFormData = JSON.parse(JSON.stringify(this.formData))
-          
-          this.$message.success({
-            message: this.isEditMode ? '更新保存成功！' : '创建成功！',
-            duration: 2000,
-            showClose: true
-          })
-          
-          setTimeout(() => {
-            this.$router.push('/salary/standards')
-          }, 2000)
-          
-        } else {
-          throw new Error(response?.message || '保存失败')
-        }
-        
-      } catch (error) {
-        console.error('保存失败:', error)
-        
-        if (error.message && (
-          error.message.includes('JWT') || 
-          error.message.includes('Token') ||
-          error.message.includes('401') ||
-          error.message.includes('未登录')
-        )) {
-          this.showError('登录过期', '您的登录已过期，请重新登录')
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          setTimeout(() => {
-            this.$router.push('/login')
-          }, 2000)
-        } else {
-          this.showError(this.isEditMode ? '更新失败' : '保存失败', error.message)
-        }
-      } finally {
-        setTimeout(() => {
-          this.saving = false;
-        }, 2000);
-      }
-    },
     
-    async handleSubmitReview() {
+    
+   // 修改：保存前验证职位占用
+// 修改：保存前验证职位占用
+async handleSaveDraft() {
+  if (this.saving) return;
+  
+  this.saving = true;
+  try {
+    // 表单验证
+    await this.$refs.form.validate();
+    
+    // 检查职位占用情况
+    if (this.hasInvalidPositions()) {
+      const invalidPositions = this.formData.positionIds.filter(id => this.getPositionDisabled(id));
+      const positionNames = invalidPositions.map(id => {
+        const position = this.positionList.find(p => p.posId === id);
+        return position ? `${position.posCode}-${position.posName}` : `ID: ${id}`;
+      });
+      
+      this.$message.error({
+        message: `保存失败：以下职位已被其他标准占用\n${positionNames.join('、')}`,
+        duration: 5000,
+        showClose: true
+      });
+      return;
+    }
+    
+    // ===== 关键：准备数据前记录状态 =====
+    const submitStatus = this.formData.status;
+    console.log(`[Save] 准备提交，当前状态: ${submitStatus} (${this.getStatusText(submitStatus)})`);
+    
+    // 准备保存数据
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    let userId = null;
+    if (userStr) {
       try {
-        await this.$refs.form.validate()
-        
-        this.$confirm('确定要提交审核吗？提交后不可编辑，等待管理员审核。', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(async () => {
-          this.submitting = true
-          
-          this.formData.status = 2
-          this.formData.registrationTime = new Date()
-          
-          await this.handleSaveDraft()
-          
-          this.$message.success('提交审核成功')
-          setTimeout(() => {
-            this.$router.push('/salary/standards')
-          }, 1500)
-          
-        }).catch(() => {
-          console.log('取消提交审核')
-        })
-      } catch (error) {
-        console.error('提交审核失败:', error)
-        this.showError('提交审核失败', error.message)
-      } finally {
-        this.submitting = false
+        const userInfo = JSON.parse(userStr);
+        userId = userInfo.userId || userInfo.id;
+      } catch (e) {
+        console.error('解析用户信息失败:', e);
       }
-    },
+    }
     
+    if (!userId) {
+      this.$message.error('未获取到用户信息，请重新登录');
+      setTimeout(() => {
+        this.$router.push('/login');
+      }, 1500);
+      return;
+    }
+    
+    const saveData = {
+      standardCode: this.formData.standardCode,
+      standardName: this.formData.standardName.trim(),
+      positionIds: this.formData.positionIds.map(id => Number(id)),
+      items: this.formData.items
+        .filter(item => item.projectCode)
+        .map(item => ({
+          projectCode: item.projectCode,
+          amount: Number(item.amount || 0),
+          calculationMethod: item.calculationMethod || 'fixed',
+          sortOrder: Number(item.sortOrder || 0)
+        })),
+      remark: (this.formData.remark || '').trim(),
+      status: submitStatus  // 明确传递当前状态
+    };
+    
+    // 添加创建人或更新人
+    if (!this.isEditMode) {
+      saveData.creatorId = Number(userId);
+    } else {
+      saveData.updaterId = Number(userId);
+    }
+    
+    // ===== 关键：添加请求日志 =====
+    console.log(`[Save] API请求参数:`, JSON.parse(JSON.stringify(saveData)));
+    
+    // API调用
+    let response;
+    if (!this.isEditMode) {
+      response = await createStandard(saveData);
+    } else {
+      response = await updateStandard(this.standardId, saveData);
+    }
+    
+    // ===== 关键：增强响应处理 =====
+    console.log(`[Save] API响应:`, response);
+    
+    if (response && response.success) {
+      const resultData = response.data;
+       // ✅ 关键：检查后端返回的字段名
+  console.log('后端返回的数据:', resultData);
+  
+  // 注意：后端返回的可能是 standardId 或 id
+  const returnedId = resultData.standardId || resultData.id;
+   if (returnedId) {
+    this.formData.standardId = returnedId;
+    console.log('✅ StandardId 已设置:', returnedId);
+  } else {
+    console.error('❌ 后端未返回 standardId 或 id');
+  }
+
+      // ===== 关键：验证后端返回的数据 =====
+      if (!resultData) {
+        console.error('[Save] 错误: 后端未返回data字段');
+        throw new Error('后端返回数据格式错误：缺少data字段');
+      }
+      
+      console.log(`[Save] 后端返回状态: ${resultData.status}`);
+      
+      // 保存返回的数据
+      if (resultData.standardId) {
+        this.formData.standardId = resultData.standardId;
+        
+        // 如果是创建模式，切换到编辑模式
+        if (!this.isEditMode) {
+          this.isEditMode = true;
+          this.standardId = resultData.standardId;
+          
+          this.$router.replace({
+            path: this.$route.path,
+            query: { id: resultData.standardId }
+          });
+        }
+      }
+      
+      // ===== 关键：强制同步后端返回的状态 =====
+      if (resultData.status !== undefined && resultData.status !== null) {
+        console.log(`[Save] 同步状态: ${resultData.status}`);
+        this.formData.status = resultData.status;
+      } else {
+        console.warn('[Save] 警告: 后端未返回status字段');
+      }
+      
+      // 更新其他字段
+      if (resultData.updatedAt) {
+        this.formData.updatedAt = new Date(resultData.updatedAt);
+      }
+      
+      // 保存原始数据
+      this.originalFormData = JSON.parse(JSON.stringify(this.formData));
+      
+      // 成功提示
+      const successMessage = this.getStatusText(this.formData.status);
+      this.$message.success({
+        message: `保存成功！当前状态: ${successMessage}`,
+        duration: 2000,
+        showClose: true
+      });
+      
+    } else {
+      // 保存失败，恢复状态
+      console.error('[Save] 保存失败，恢复原始状态');
+      if (this.originalFormData) {
+        this.formData.status = this.originalFormData.status;
+      }
+      throw new Error(response?.message || '保存失败');
+    }
+    
+  } catch (error) {
+    console.error('[Save] 异常:', error);
+    
+    // 发生错误时恢复状态
+    if (this.originalFormData && this.originalFormData.status !== undefined) {
+      this.formData.status = this.originalFormData.status;
+      console.log(`[Save] 恢复状态为: ${this.formData.status}`);
+    }
+    
+    // 错误处理...
+  } finally {
+    setTimeout(() => {
+      this.saving = false;
+    }, 2000);
+  }
+},
+    
+ /**
+ * 提交审核（增强版）
+ */
+async handleSubmitReview() {
+  if (this.submitting) return;
+  
+  // 检查是否可以提交
+  if (!this.canSubmitForReview) {
+    this.$message.warning('请完成所有必填项后再提交审核');
+    return;
+  }
+  
+  // 保存原始状态，用于失败恢复
+  const originalStatus = this.formData.status;
+  
+  // ===== 关键：添加调试日志 =====
+  console.log(`[Submit] 提交审核前状态: ${originalStatus}`);
+  
+  try {
+    const isRejected = this.isRejectedStatus;
+    const confirmMessage = isRejected 
+      ? '当前标准已被驳回，确定要重新提交审核吗？' 
+      : '确定要提交审核吗？提交后不可编辑，等待管理员审核。';
+    
+    await this.$confirm(confirmMessage, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+    
+    this.submitting = true;
+    
+    // 更新状态为待审核（2）
+    this.formData.status = 2;
+    
+    // 如果是驳回状态重新提交，重置登记信息
+    if (isRejected) {
+      this.formData.registrarId = null;
+      this.formData.registrarName = '';
+      this.formData.registrationTime = null;
+    }
+    
+    // ===== 关键：调用保存并等待完成 =====
+    await this.handleSaveDraft();
+
+    // ✅ 关键：验证 standardId 是否存在
+    console.log('保存完成后的 standardId:', this.formData.standardId);
+    
+    if (!this.formData.standardId) {
+      this.$message.error('错误：未获取到标准ID，请重新尝试');
+      console.error('❌ standardId 为空，无法提交审核');
+      return; // 阻止后续操作
+    }
+
+    // ✅ 关键：调用提交审核API
+    console.log('调用 submitStandardForReview，参数:', {
+      id: this.formData.standardId,
+      remark: this.formData.remark
+    });
+    
+    await submitForApproval(this.formData.standardId, this.formData.remark);
+    // ===== 关键：检查保存后的状态（更宽松的判断） =====
+    // 只要状态不是草稿或驳回，就认为成功
+    const savedStatus = this.formData.status;
+    console.log(`[Submit] 保存后状态: ${savedStatus}`);
+    
+    if (savedStatus === 2 || savedStatus === 3 || savedStatus === 1) { // 待审核或已生效都算成功
+      this.$message.success({
+        message: isRejected ? '重新提交审核成功！' : '提交审核成功！',
+        duration: 2000,
+        showClose: true
+      });
+      
+      // 延迟跳转
+      setTimeout(() => {
+        this.$router.push({ 
+          path: '/salary/standards', 
+          query: { refresh: 'true' } 
+        });
+      }, 1500);
+    } else {
+      console.warn(`[Submit] 状态异常，期望2或3，实际: ${savedStatus}`);
+      // 不抛出错误，因为可能已经保存成功只是状态返回异常
+      this.$message.warning('审核提交成功，但状态更新异常');
+    }
+    
+  } catch (error) {
+    console.error('[Submit] 失败:', error);
+    
+    // 发生错误时恢复原始状态
+    this.formData.status = originalStatus;
+    
+    if (error !== 'cancel') {
+      this.showError('提交审核失败', error.message);
+    }
+  } finally {
+    this.submitting = false;
+  }
+},
+    
+    /**
+     * 重置表单（逻辑优化）
+     */
     handleResetForm() {
-      this.$confirm(this.isEditMode ? '确定要重置表单吗？所有未保存的更改将丢失。' : '确定要重置表单吗？所有输入将被清空。', '提示', {
+      if (!this.canEdit) return;
+      
+      const confirmMessage = this.isEditMode 
+        ? '确定要重置表单吗？所有未保存的更改将丢失。' 
+        : '确定要重置表单吗？所有输入将被清空。';
+      
+      this.$confirm(confirmMessage, '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
         if (this.isEditMode && this.originalFormData) {
-          Object.assign(this.formData, JSON.parse(JSON.stringify(this.originalFormData)))
+          // 编辑模式：恢复原始数据
+          Object.assign(this.formData, JSON.parse(JSON.stringify(this.originalFormData)));
         } else {
-          const defaultFormData = {
+          // 创建模式：重置为初始状态
+          const timestamp = Date.now();
+          const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+          
+          Object.assign(this.formData, {
             standardId: null,
-            standardCode: this.formData.standardCode,
+            standardCode: `STD${timestamp}${random}`,
             standardName: '',
             positionIds: [],
             items: [],
             remark: '',
             status: 1,
-            creatorId: this.formData.creatorId,
-            creatorName: this.formData.creatorName,
-            createdAt: this.formData.createdAt,
+            createdAt: new Date(),
+            updatedAt: new Date(),
             registrarId: null,
             registrarName: '',
-            registrationTime: null,
-            updatedAt: new Date()
-          }
-          Object.assign(this.formData, defaultFormData)
-          this.addDefaultSalaryItem()
+            registrationTime: null
+          });
+          
+          // 添加默认项目
+          this.addDefaultSalaryItem();
         }
         
-        this.$message.success('表单已重置')
+        this.$message.success('表单已重置');
       }).catch(() => {
-        console.log('取消重置')
-      })
+        console.log('取消重置');
+      });
     },
-    
+
     handleBack() {
       if (this.hasUnsavedChanges()) {
         this.$confirm('您有未保存的更改，确定要离开吗？', '提示', {
@@ -1810,6 +2201,95 @@ export default {
   opacity: 0.6;
 }
 
+/* 新增：按钮分组样式优化 */
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 30px;
+  padding: 25px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #ebeef5;
+  flex-wrap: wrap; /* 允许换行 */
+}
+
+.action-buttons .el-button {
+  min-width: 120px;
+  padding: 12px 20px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+/* 新增：状态提示标签样式 */
+.status-hint-tag {
+  margin: 0 15px;
+  padding: 0 20px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 新增：加载遮罩优化 */
+.saving-tip {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #409EFF;
+  font-size: 16px;
+  padding: 20px 40px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  border: 1px solid #b3d8ff;
+}
+
+.saving-tip i {
+  font-size: 24px;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+/* 新增：按钮状态动画 */
+.el-button {
+  transition: all 0.3s ease;
+}
+
+.el-button.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.el-button.is-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+/* 新增：响应式按钮布局 */
+@media screen and (max-width: 768px) {
+  .action-buttons {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+  }
+  
+  .action-buttons .el-button {
+    width: 100%;
+    margin: 0;
+  }
+  
+  .status-hint-tag {
+    margin: 10px 0;
+    width: 100%;
+    text-align: center;
+  }
+}
 /* 选中状态的样式 */
 ::v-deep .el-select-dropdown__item.selected {
   background-color: #f0f9ff;

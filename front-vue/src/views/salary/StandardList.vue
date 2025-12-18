@@ -429,6 +429,7 @@ export default {
   },
   
   created() {
+
     console.log('====== StandardList 组件创建 ======')
     console.log('当前路由:', this.$route.path)
     
@@ -652,6 +653,8 @@ export default {
         query: { id: row.standardId, mode: 'edit' }
       })
     },
+
+    
     
     // 提交审核
     handleSubmit(row) {

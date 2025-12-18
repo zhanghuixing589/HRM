@@ -610,7 +610,12 @@ public List<Map<String, Object>> getAllSalaryProjects() {
             standard.setStandardCode(dto.getStandardCode());
             standard.setStandardName(dto.getStandardName());
             standard.setCreatorId(creatorId);
-            standard.setStatus(1); // 草稿状态
+             Integer status = dto.getStatus() != null ? dto.getStatus() : 1; // 默认为草稿
+    if (status != 1 && status != 0) { // 只允许草稿(1)或驳回(0)状态创建
+        log.warn("非法的创建状态: {}, 强制重置为草稿(1)", status);
+        status = 1;
+    }
+    standard.setStatus(status);
             standard.setCreatedAt(LocalDateTime.now());
             standard.setUpdatedAt(LocalDateTime.now());
 
@@ -709,6 +714,12 @@ public List<Map<String, Object>> getAllSalaryProjects() {
                     "当前状态不能编辑，只有草稿或驳回状态可修改");
         }
 
+         // ===== 关键：验证新状态的合法性 =====
+    Integer newStatus = dto.getStatus();
+    if (newStatus == null) {
+        newStatus = standard.getStatus(); // 如果前端没传状态，保持原状态
+    }
+
         // 3. 验证职位数据（新增）
         if (dto.getPositionIds() == null || dto.getPositionIds().isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "请至少选择一个适用职位");
@@ -734,10 +745,21 @@ public List<Map<String, Object>> getAllSalaryProjects() {
             standardPositionRepository.deleteByStandardIdNative(standardId);
             standardItemRepository.deleteByStandardIdNative(standardId);
 
+             boolean isValidTransition = ( standard.getStatus() == 1 && (newStatus == 1 || newStatus == 2)) ||
+                               ( standard.getStatus() == 0 && (newStatus == 0 || newStatus == 2));
+    
+    if (!isValidTransition) {
+        throw new BusinessException(ResultCode.ERROR, 
+                String.format("非法的状态转换: %s(%d) -> %s(%d)", 
+                    getStatusName( standard.getStatus()),  standard.getStatus(), 
+                    getStatusName(newStatus), newStatus));
+    }
+
              // 6. 关键：更新基本信息后立即刷新（确保Hibernate检测到变化）
         standard.setStandardName(dto.getStandardName().trim());
         standard.setCreatorId(updaterId);
         standard.setUpdatedAt(LocalDateTime.now());
+        standard.setStatus(newStatus);
 
         System.out.println("更新后数据名称："+ standard.getStandardName());
             
@@ -814,6 +836,16 @@ public List<Map<String, Object>> getAllSalaryProjects() {
         }
     }
 
+    private String getStatusName(Integer status) {
+    if (status == null) return "未知";
+    switch (status) {
+        case 0: return "驳回";
+        case 1: return "草稿";
+        case 2: return "待审核";
+        case 3: return "已生效";
+        default: return "非法状态";
+    }
+}
     /**
  * 提交审核
  */
@@ -982,7 +1014,7 @@ public void submitForApproval(Long standardId, Long submitterId, String comment)
             approval.setApprovalTime(LocalDateTime.now());
             approval.setApprovalStatus(0); // 驳回
             approval.setApprovalOpinion(opinion);
-            approval.setIsActive(1);
+            approval.setIsActive(0);
             standardApprovalRepository.save(approval);
 
             // 5. 记录操作日志
@@ -1185,9 +1217,6 @@ public StandardDetailResponseDTO getStandardDetailById(Long standardId) {
 /**
  * 获取标准审核详情（专为审核页面设计）
  */
-/**
- * 获取标准审核详情（简单版本）
- */
 @Transactional(readOnly = true)
 public StandardDetailResponseDTO getStandardApprovalDetail(Long standardId) {
     log.info("获取标准审核详情，ID：{}", standardId);
@@ -1206,17 +1235,38 @@ public StandardDetailResponseDTO getStandardApprovalDetail(Long standardId) {
         List<StandardPosition> positions = standardPositionRepository.findByStandard(standard);
         standard.setStandardPositions(positions);
         
-        // 4. 获取审核记录
+        // 4. 获取所有审核记录（包括已驳回的）
         List<StandardApproval> approvals = standardApprovalRepository.findByStandardId(standardId);
         standard.setApprovals(approvals);
         
         // 5. 转换为响应DTO
         StandardDetailResponseDTO dto = convertToDetailResponseDTO(standard);
         
-        // 6. 获取当前活跃的审核记录
-        List<StandardApproval> activeApprovals = standardApprovalRepository.findActiveApprovalsByStandardId(standardId);
-        if (!activeApprovals.isEmpty()) {
-            dto.setCurrentApproval(convertApprovalToDTO(activeApprovals.get(0)));
+        // 6. **核心修复：根据标准状态获取对应的审核记录**
+        StandardApproval currentApproval = null;
+        
+        if (standard.getStatus() == 0) { // 已驳回 - 获取最新的驳回记录（isActive=0）
+            currentApproval = approvals.stream()
+                .filter(a -> a.getApprovalStatus() == 0 && !a.getIsActive().equals(1) ) // 驳回且非活跃
+                .sorted(Comparator.comparing(StandardApproval::getApprovalTime).reversed())
+                .findFirst()
+                .orElse(null);
+        } else if (standard.getStatus() == 2) { // 待审核 - 获取活跃记录（isActive=1）
+            List<StandardApproval> activeApprovals = standardApprovalRepository.findActiveApprovalsByStandardId(standardId);
+            if (!activeApprovals.isEmpty()) {
+                currentApproval = activeApprovals.get(0); // isActive=1
+            }
+        } else if (standard.getStatus() == 3) { // 已通过 - 获取最新的通过记录
+            currentApproval = approvals.stream()
+                .filter(a -> a.getApprovalStatus() == 3) // 已通过
+                .sorted(Comparator.comparing(StandardApproval::getApprovalTime).reversed())
+                .findFirst()
+                .orElse(null);
+        }
+        
+        // 设置 currentApproval
+        if (currentApproval != null) {
+            dto.setCurrentApproval(convertApprovalToDTO(currentApproval));
         }
         
         // 7. 获取所有审核日志
@@ -1299,6 +1349,7 @@ private StandardDetailResponseDTO.ApprovalLogDTO convertApprovalLogToDTO(Standar
             dto.setOperatorName("未知");
         }
     }
+    
     
     return dto;
 }

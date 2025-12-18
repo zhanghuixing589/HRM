@@ -30,5 +30,10 @@ public interface StandardApprovalRepository  extends JpaRepository<StandardAppro
     @Query("SELECT a FROM StandardApproval a WHERE a.standard.standardId = :standardId")
     List<StandardApproval> findByStandardId(@Param("standardId") Long standardId);
 
+     /**
+     * 根据标准ID和活跃状态查询审核记录
+     */
+Optional<StandardApproval> findByStandard_StandardIdAndIsActive(Long standardId, Integer isActive);
     
+
     }

@@ -6,11 +6,7 @@ import javax.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "standard_position", 
-       uniqueConstraints = {
-           @UniqueConstraint(name = "uk_position_level", 
-                           columnNames = {"position_id", "standard_level"})
-       })
+@Table(name = "standard_position")
 @Data
 @Builder
 @NoArgsConstructor
@@ -27,9 +23,6 @@ public class StandardPosition {
     @JoinColumn(name = "standard_id", nullable = false)
     private Standard standard;
     
-    // 标准等级字段 - 对应数据库的 standard_level 列
-    @Column(name = "standard_level", length = 50, nullable = false)
-    private String standardLevel;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id", nullable = false)
@@ -43,19 +36,5 @@ public class StandardPosition {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
-    
-    // 验证标准等级是否有效
-    public boolean isValidLevel() {
-        if (standardLevel == null) return false;
-        return standardLevel.equals("初级") || 
-               standardLevel.equals("中级") || 
-               standardLevel.equals("高级");
-    }
-    
-    // 获取完整显示名称
-    public String getFullDisplayName() {
-        String level = (standardLevel != null && !standardLevel.isEmpty()) ? 
-                      " - " + standardLevel : "";
-        return getStandard().getStandardName() + level;
-    }
+
 }

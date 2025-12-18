@@ -105,11 +105,20 @@ const routes = [
 },
 
 {
-  path:'/salary/Payment',
+  path:'/salary/payment/create',
   name: 'SalaryPaymentCreate',
   component: () => import('@/views/salary/SalaryPaymentCreate.vue'),
   meta: { title: '薪酬发放表单', requiresAuth: true,
        roles: [1,3,5]
+     }
+},
+
+{
+  path :'/employee/dashboard',
+  name:'EmployeeDahsboard',
+  component: () => import('@/views/employee/EmployeeDahsboard.vue'),
+   meta: { title: '用户个人中心', requiresAuth: true,
+       roles: [6]
      }
 },
 

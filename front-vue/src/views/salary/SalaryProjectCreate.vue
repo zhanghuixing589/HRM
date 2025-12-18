@@ -204,19 +204,7 @@
                 </el-row>
               </div>
               
-              <div v-if="projectForm.calculationMethod === '公式计算'">
-                <el-form-item label="计算公式" prop="formula">
-                  <el-input
-                    v-model="projectForm.params.formula"
-                    type="textarea"
-                    :rows="3"
-                    placeholder="请输入计算公式，如：${baseSalary} * 0.1"
-                  />
-                  <div class="form-tip">
-                    可用变量：${baseSalary}（基本工资）、${workDays}（实际工作天数）、${totalDays}（总工作天数）、${attendanceDays}（出勤天数）
-                  </div>
-                </el-form-item>
-              </div>
+            
             </div>
           </el-form-item>
         </el-form>

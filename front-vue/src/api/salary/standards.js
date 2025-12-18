@@ -176,10 +176,12 @@ export function batchCheckPositionsOccupied(positionIds, params = {}) {
  * @returns {Promise}
  */
 export function submitForApproval(id, comment) {
+   console.log('API 提交审核，参数:', { id, comment }); 
   return api.post(`/api/salary/standards/${id}/submit`, null, {
     params: { comment }
   })
 }
+
 
 /**
  * 审核通过
