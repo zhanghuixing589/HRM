@@ -14,13 +14,14 @@ const routes = [
     name: 'HrmLayout',
     component: () => import('@/views/HrmLayout.vue')
   },
-<<<<<<< HEAD
 
   {
     path:'/salary/manage',
     name: 'SalaryManage',
     component: () => import('@/views/salary/Manage.vue'),
-    meta: { title: '薪酬管理', requiresAuth: true }
+    meta: { title: '薪酬管理', requiresAuth: true,
+       roles: [3, 4, 6]
+     }
     
   },
 
@@ -28,15 +29,70 @@ const routes = [
   path: '/salary/projects',
   name: 'SalaryProjectList',
   component: () => import('@/views/salary/SalaryProjectList.vue'),
-  meta: { title: '薪酬项目管理', requiresAuth: true }
+  meta: { title: '薪酬项目管理', requiresAuth: true ,roles: [1,3,5]  }
 },
 {
   path: '/salary/projects/create',
   name: 'SalaryProjectCreate',
   component: () => import('@/views/salary/SalaryProjectCreate.vue'),
-  meta: { title: '创建薪酬项目', requiresAuth: true }
-}
-=======
+  meta: { title: '创建薪酬项目', requiresAuth: true ,roles: [3,]}
+},
+ {
+    path: '/salary/standards',
+    name: 'SalaryStandardList',
+    component: () => import('@/views/salary/StandardList.vue'),
+    meta: { 
+      title: '薪酬标准管理', 
+      requiresAuth: true,
+      // 只需要查看权限即可访问页面
+    roles: [1, 2, 3, 4, 5] // 所有经理和专员都可以查看
+    }
+  },
+  {
+    path: '/salary/standards/create',
+    name: 'SalaryStandardCreate',
+    component: () => import('@/views/salary/StandardForm.vue'),
+    props: { mode: 'create' },
+    meta: { 
+      title: '创建薪酬标准', 
+      requiresAuth: true,
+      roles: [1,3,5] 
+    }
+  },
+  {
+    path: '/salary/standards/edit/:id',
+    name: 'SalaryStandardEdit',
+    component: () => import('@/views/salary/StandardForm.vue'),
+    props: { mode: 'edit' },
+    meta: { 
+      title: '编辑薪酬标准', 
+      requiresAuth: true,
+      roles: [1,3,5] 
+    }
+  },
+
+  // 在路由配置中添加
+{
+  path: '/salary/standards/:id/approval',
+  name: 'StandardApprovalDetail',
+  component: () => import('@/views/salary/ApprovalDetail.vue'),
+  meta: {
+    title: '薪酬标准审核',
+    requireAuth: true,
+    roles: [1,3] // FINANCE_MANAGER
+  }
+},
+{
+  path: '/salary/standards/:id/approval-history',
+  name: 'ApprovalHistory',
+  component: () => import('@/views/salary/ApprovalHistory.vue'),
+  meta: {
+    title: '审核历史记录',
+    requireAuth: true,
+    roles: [1, 3, 5] // HR_MANAGER, FINANCE_MANAGER, SALARY_SPECIALIST
+  }
+},
+
   {
     path: '/hr/archive',
     component: () => import('@/views/archive/ArchiveLayout.vue'),
@@ -83,7 +139,6 @@ const routes = [
       }
     ]
   }
->>>>>>> 299f4a6d61439963b166b87416c7c18adb26ce7d
 ]
 
 const router = new VueRouter({

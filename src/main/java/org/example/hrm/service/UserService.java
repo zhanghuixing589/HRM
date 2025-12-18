@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Transactional
@@ -141,4 +142,52 @@ public class UserService implements UserDetailsService {
     public List<User> findAll() {
       return userRepository.findAll();
     }
+
+    /**
+     * 根据用户ID获取用户名
+     */
+    public String getUserNameById(Long userId) {
+        if (userId == null) {
+            log.warn("获取用户名失败：用户ID为空");
+            return "未知";
+        }
+        
+        try {
+            return userRepository.findById(userId)
+                    .map(User::getUserName)
+                    .orElse("未知");
+        } catch (Exception e) {
+            log.error("获取用户名失败，用户ID：{}", userId, e);
+            return "未知";
+        }
+    }
+
+    /**
+     * 根据用户ID获取用户信息
+     */
+    public User getUserById(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        
+        return userRepository.findById(userId).orElse(null);
+    }
+
+    /**
+ * 批量获取用户名称
+ */
+public List<Map<String, Object>> batchGetUserNames(List<Long> userIds) {
+    if (userIds == null || userIds.isEmpty()) {
+        return new ArrayList<>();
+    }
+    
+    try {
+        // 这里根据你的UserRepository实现具体查询逻辑
+        // 示例：查询用户表，返回用户ID和名称
+        return userRepository.findUserNamesByIds(userIds);
+    } catch (Exception e) {
+        log.error("批量获取用户名称失败", e);
+        return new ArrayList<>();
+    }
+}
 }

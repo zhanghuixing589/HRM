@@ -1,68 +1,173 @@
 package org.example.hrm.entity;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import javax.persistence.*;
-import java.util.Date;
 
-/* 薪酬项目 */
+import java.io.Serializable;
+import java.util.Date;
+import java.util.Objects;
+
+/**
+ * 薪酬项目实体类
+ * 对应数据库表: project_薪资项目表
+ */
 @Data
 @Entity
 @Table(name = "project")
-
-public class SalaryProject {
-     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+@NoArgsConstructor
+@AllArgsConstructor
+public class SalaryProject implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
+    
+   @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)  // 添加这个注解
+    @Column(name = "project_id")
     private Long projectId;
-
-    @Column(name = "project_code",unique = true, nullable = false)
+    
+    /**
+     * 项目编码，唯一
+     */
+    @Column(name = "project_code", nullable = false, length = 50)
     private String projectCode;
     
-    @Column(name = "project_name", nullable = false)
+    /**
+     * 项目名称
+     */
+    @Column(name = "project_name", nullable = false, length = 100)
     private String projectName;
-
+    
+    /**
+     * 项目类型：1=收入项，2=扣减项
+     */
     @Column(name = "project_type", nullable = false)
-    private Integer projectType; // 1-增加项，2-扣除项
-
-    @Column(name = "category", nullable = false)
-    private String category; // 类别基本薪资/奖金/津贴/社保/扣款
-
-    @Column(name = "calculation_method", nullable = false)
-    private String calculationMethod; // 计算方法固定值/百分比/公式计算
-
+    private Integer projectType;
+    
+    /**
+     * 项目类别：salary/insurance/bonus/deduction 等
+     */
+    @Column(name = "category", nullable = false, length = 20)
+    private String category;
+    
+    /**
+     * 计算方式：fixed/percentage/formula 等
+     */
+    @Column(name = "calculation_method", nullable = false, length = 20)
+    private String calculationMethod;
+    
+    /**
+     * 排序号
+     */
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
-
-     @Column(name = "params", columnDefinition = "TEXT")
-    private String params; // JSON格式的参数字符串
-
-
+    
+    /**
+     * 状态：1=启用，0=禁用
+     */
+    @Column(name = "status")
+    private Integer status = 1;
+    
+    /**
+     * 项目描述
+     */
+    @Column(name = "description", length = 500)
+    private String description;
+    
+    /**
+     * 创建时间
+     */
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt;
-
-    @Column(name = "description")
-    private String description;
-
-      /**
-     * JPA实体保存前的回调方法
-     * 自动设置创建时间
+    
+    /**
+     * 计算参数，JSON格式存储
+     */
+    @Column(name = "params", columnDefinition = "TEXT")
+    private String params;
+    
+    /**
+     * JPA持久化前的回调，自动设置创建时间
      */
     @PrePersist
     protected void onCreate() {
-        this.createdAt = new Date();
-    }
-
-     // 如果确实缺少getId()方法，手动添加
-    public Long getId() {
-        return this.projectId; // 注意：这里返回projectId，因为字段名是projectId
+        if (this.createdAt == null) {
+            this.createdAt = new Date();
+        }
+        // 设置默认值
+        if (this.sortOrder == null) {
+            this.sortOrder = 0;
+        }
+        if (this.status == null) {
+            this.status = 1; // 默认启用
+        }
     }
     
-    // 或者更好的方式：添加getProjectId()方法（如果前端使用projectId字段）
-    public Long getProjectId() {
-        return this.projectId;
+    /**
+     * 获取项目类型名称
+     */
+    @Transient
+    public String getProjectTypeName() {
+        if (projectType == null) return "";
+        switch (projectType) {
+            case 1: return "收入项";
+            case 2: return "扣减项";
+            default: return "未知类型";
+        }
+    }
+    
+    /**
+     * 获取状态名称
+     */
+    @Transient
+    public String getStatusName() {
+        if (status == null) return "";
+        switch (status) {
+            case 1: return "启用";
+            case 0: return "禁用";
+            default: return "未知状态";
+        }
+    }
+    
+    /**
+     * 判断是否启用
+     */
+    @Transient
+    public boolean isEnabled() {
+        return status != null && status == 1;
+    }
+    
+    /**
+     * 判断是否是收入项
+     */
+    @Transient
+    public boolean isIncome() {
+        return projectType != null && projectType == 1;
+    }
+    
+    /**
+     * 判断是否是扣减项
+     */
+    @Transient
+    public boolean isDeduction() {
+        return projectType != null && projectType == 2;
     }
 
+     // 重写 equals 和 hashCode 方法，避免序列化问题
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SalaryProject that = (SalaryProject) o;
+        return Objects.equals(projectId, that.projectId) &&
+               Objects.equals(projectCode, that.projectCode);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(projectId, projectCode);
+    }
 }

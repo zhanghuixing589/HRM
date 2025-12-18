@@ -12,8 +12,28 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   config => { 
-    const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    console.log('发送请求:', config.url, config.method)
+    
+    // 清除损坏的 token
+    const token = localStorage.getItem('token')
+    if (token) {
+      // 检查 token 是否损坏
+      try {
+        // 简单的 token 验证
+        if (token.includes('�') || token.length < 20) { // 损坏的 token 特征
+          console.warn('检测到损坏的 token，正在清除...')
+          localStorage.removeItem('token')
+          sessionStorage.removeItem('token')
+          // 不添加 Authorization 头
+        } else {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+      } catch (error) {
+        console.error('Token 验证失败:', error)
+        localStorage.removeItem('token')
+        sessionStorage.removeItem('token')
+      }
+    }
     return config
   },
   error => Promise.reject(error)
@@ -39,11 +59,58 @@ export const getProjectList = (params) => {
     params: params
   })
 }
+
 export const getAllProjects = () => api.get('/api/salary/projects/list')
-export const createProject = (data) => api.post('/api/salary/projects', data)
+
+// 创建项目 - 注意这里使用 /create 路径
+export const createProject = (data) => api.post('/api/salary/projects/create', data)
+
 export const updateProject = (id, data) => api.put(`/api/salary/projects/${id}`, data)
+
 export const deleteProject = (id) => api.delete(`/api/salary/projects/${id}`)
+
 export const batchDeleteProjects = (ids) => api.delete('/api/salary/projects/batch', { data: ids })
+
 export const getProjectEnums = () => api.get('/api/salary/projects/enums')
-export const checkProjectCode = (projectCode) => api.get(`/api/salary/projects/check-code/${projectCode}`)
+
+// 检查项目编码 - 添加 excludeId 参数支持
+export const checkProjectCode = (projectCode, excludeId = null) => {
+  return api.get(`/api/salary/projects/check-code/${projectCode}`, {
+    params: { excludeId }
+  })
+}
+
 export const getProjectById = (id) => api.get(`/api/salary/projects/${id}`)
+
+// 以下为新增的API接口，对应Controller中的其他方法
+export const getProjectByCode = (projectCode) => api.get(`/api/salary/projects/code/${projectCode}`)
+
+export const enableProject = (id) => api.put(`/api/salary/projects/${id}/enable`)
+
+export const disableProject = (id) => api.put(`/api/salary/projects/${id}/disable`)
+
+export const getEnabledProjects = () => api.get('/api/salary/projects/enabled')
+
+export const getEnabledIncomeProjects = () => api.get('/api/salary/projects/enabled/income')
+
+export const getEnabledDeductionProjects = () => api.get('/api/salary/projects/enabled/deduction')
+
+export const getProjectsByCategory = (category) => api.get(`/api/salary/projects/by-category/${category}`)
+
+export const getProjectsByType = (type) => api.get(`/api/salary/projects/by-type/${type}`)
+
+// 枚举相关的API
+export const getProjectTypesEnum = () => api.get('/api/salary/projects/enums/project-types')
+
+export const getProjectCategoriesEnum = () => api.get('/api/salary/projects/enums/project-categories')
+
+export const getCalculationMethodsEnum = () => api.get('/api/salary/projects/enums/calculation-methods')
+
+export const getPredefinedCodesEnum = () => api.get('/api/salary/projects/enums/predefined-codes')
+
+
+// 导入项目（可选功能）
+export const importProjects = (data) => api.post('/api/salary/projects/import', data)
+
+// 导出默认API实例（如果需要）
+export default api

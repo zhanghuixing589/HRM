@@ -130,6 +130,16 @@
             </div>
           </el-form-item>
           
+          <el-form-item label="状态" prop="status">
+            <el-radio-group v-model="projectForm.status">
+              <el-radio :label="1">启用</el-radio>
+              <el-radio :label="0">禁用</el-radio>
+            </el-radio-group>
+            <div class="form-tip">
+              禁用状态下项目将不会出现在可选项列表中
+            </div>
+          </el-form-item>
+          
           <el-form-item label="项目描述" prop="description">
             <el-input
               v-model="projectForm.description"
@@ -151,6 +161,9 @@
                       <el-input
                         v-model="projectForm.params.fixedAmount"
                         placeholder="请输入固定金额"
+                        type="number"
+                        min="0"
+                        step="0.01"
                       >
                         <template slot="append">元</template>
                       </el-input>
@@ -166,6 +179,10 @@
                       <el-input
                         v-model="projectForm.params.percentage"
                         placeholder="请输入百分比"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
                       >
                         <template slot="append">%</template>
                       </el-input>
@@ -180,6 +197,7 @@
                       >
                         <el-option label="实际基本工资" value="actualBaseSalary" />
                         <el-option label="标准基本工资" value="standardBaseSalary" />
+                        <el-option label="其他项目合计" value="otherTotal" />
                       </el-select>
                     </el-form-item>
                   </el-col>
@@ -195,7 +213,7 @@
                     placeholder="请输入计算公式，如：${baseSalary} * 0.1"
                   />
                   <div class="form-tip">
-                    可用变量：${baseSalary}（基本工资）、${workDays}（实际工作天数）、${totalDays}（总工作天数）
+                    可用变量：${baseSalary}（基本工资）、${workDays}（实际工作天数）、${totalDays}（总工作天数）、${attendanceDays}（出勤天数）
                   </div>
                 </el-form-item>
               </div>
@@ -209,6 +227,7 @@
             {{ isEditMode ? '更新' : '创建' }}
           </el-button>
         </div>
+
       </el-card>
     </div>
   </div>
@@ -234,6 +253,7 @@ export default {
         category: '',
         calculationMethod: '',
         sortOrder: 0,
+        status: 1,
         description: '',
         params: {
           fixedAmount: '',
@@ -257,11 +277,12 @@ export default {
       rules: {
         projectCode: [
           { required: true, message: '请输入项目编码', trigger: 'blur' },
-          { pattern: /^[A-Z_]+$/, message: '编码只能包含大写字母和下划线', trigger: 'blur' },
+          { pattern: /^[A-Z0-9_]+$/, message: '编码只能包含大写字母、数字和下划线', trigger: 'blur' },
           { validator: this.validateProjectCode, trigger: 'blur' }
         ],
         projectName: [
-          { required: true, message: '请输入项目名称', trigger: 'blur' }
+          { required: true, message: '请输入项目名称', trigger: 'blur' },
+          { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
         ],
         projectType: [
           { required: true, message: '请选择项目类型', trigger: 'change' }
@@ -271,6 +292,9 @@ export default {
         ],
         calculationMethod: [
           { required: true, message: '请选择计算方法', trigger: 'change' }
+        ],
+        sortOrder: [
+          { type: 'number', min: 0, max: 999, message: '排序顺序必须在0-999之间', trigger: 'blur' }
         ]
       }
     }
@@ -305,25 +329,38 @@ export default {
             projectType: project.projectType,
             category: project.category,
             calculationMethod: project.calculationMethod,
-            sortOrder: project.sortOrder,
+            sortOrder: project.sortOrder || 0,
+            status: project.status || 1,
             description: project.description || '',
-            params: project.params || {
-              fixedAmount: '',
-              percentage: '',
-              baseType: 'actualBaseSalary',
-              formula: ''
+            params: {}
+          }
+          
+          // 解析params参数（JSON字符串转对象）
+          if (project.params) {
+            try {
+              this.projectForm.params = JSON.parse(project.params)
+            } catch (e) {
+              console.warn('解析params参数失败:', e)
+              this.projectForm.params = {
+                fixedAmount: '',
+                percentage: '',
+                baseType: 'actualBaseSalary',
+                formula: ''
+              }
             }
           }
           
           // 设置预定义编码
-          const predefinedCode = this.predefinedCodes.find(code => code.code === project.projectCode)
-          if (predefinedCode) {
-            this.predefinedCode = project.projectCode
+          if (this.predefinedCodes.length > 0) {
+            const predefinedCode = this.predefinedCodes.find(code => code.code === project.projectCode)
+            if (predefinedCode) {
+              this.predefinedCode = project.projectCode
+            }
           }
         }
       } catch (error) {
         console.error('加载项目数据失败:', error)
-        this.$message.error('加载项目数据失败')
+        this.$message.error(error.response?.data?.message || '加载项目数据失败')
       }
     },
     
@@ -339,6 +376,7 @@ export default {
         }
       } catch (error) {
         console.error('获取枚举数据失败:', error)
+        this.$message.error('获取枚举数据失败')
       }
     },
     
@@ -357,12 +395,12 @@ export default {
     
     // 处理编码失去焦点
     async handleCodeBlur() {
-      if (this.projectForm.projectCode) {
-        await this.validateProjectCode()
+      if (this.projectForm.projectCode && !this.isEditMode) {
+        await this.validateCodeUnique()
       }
     },
     
-    // 验证项目编码
+    // 验证项目编码（表单验证器）
     async validateProjectCode(rule, value, callback) {
       if (!value) {
         callback(new Error('请输入项目编码'))
@@ -374,27 +412,79 @@ export default {
         return
       }
       
-      // 检查编码是否已存在
-      try {
-        const excludeId = this.isEditMode ? this.currentProjectId : null
-        const response = await checkProjectCode(value, excludeId)
-        if (response.data && response.data.exists) {
-          callback(new Error('项目编码已存在'))
-        } else {
-          callback()
-        }
-      } catch (error) {
-        console.error('检查项目编码失败:', error)
+      // 检查编码唯一性
+      const isUnique = await this.validateCodeUnique()
+      if (!isUnique) {
+        callback(new Error('项目编码已存在'))
+      } else {
         callback()
       }
+    },
+    
+    // 验证编码唯一性
+    async validateCodeUnique() {
+      if (!this.projectForm.projectCode) return false
+      
+      try {
+        const excludeId = this.isEditMode ? this.currentProjectId : null
+        const response = await checkProjectCode(this.projectForm.projectCode, excludeId)
+        return !response.data.exists
+      } catch (error) {
+        console.error('检查项目编码失败:', error)
+        return false
+      }
+    },
+    
+    // 构建提交数据
+    buildSubmitData() {
+      const formData = { ...this.projectForm }
+      
+      // 处理params参数
+      if (formData.params) {
+        // 清理空值
+        const cleanedParams = {}
+        Object.keys(formData.params).forEach(key => {
+          const value = formData.params[key]
+          if (value !== '' && value !== null && value !== undefined) {
+            // 如果是数字，确保是数值类型
+            if (key === 'fixedAmount' || key === 'percentage') {
+              cleanedParams[key] = Number(value)
+            } else {
+              cleanedParams[key] = value
+            }
+          }
+        })
+        
+        // 如果有参数，转换为JSON字符串
+        if (Object.keys(cleanedParams).length > 0) {
+          formData.params = JSON.stringify(cleanedParams)
+        } else {
+          formData.params = null
+        }
+      }
+      
+      // 确保数字字段为数值类型
+      formData.sortOrder = Number(formData.sortOrder) || 0
+      formData.status = Number(formData.status) || 1
+      formData.projectType = Number(formData.projectType) || 1
+      
+      return formData
     },
 
     // 处理提交
     async handleSubmit() {
-      const valid = await this.$refs.projectForm.validate()
-      if (!valid) return
-      
       try {
+        // 验证表单
+        const valid = await this.$refs.projectForm.validate()
+        if (!valid) return
+        
+        // 验证编码唯一性（编辑模式下也要验证）
+        const isCodeValid = await this.validateCodeUnique()
+        if (!isCodeValid) {
+          this.$message.error('项目编码已存在，请修改编码')
+          return
+        }
+        
         // 添加确认提示
         const action = this.isEditMode ? '更新' : '创建'
         await this.$confirm(`确定要${action}这个薪酬项目吗？`, `确认${action}`, {
@@ -402,61 +492,33 @@ export default {
           cancelButtonText: '取消',
           type: 'warning'
         })
-      } catch (cancel) {
-        console.log('用户取消了操作')
-        return
-      }
-      
-      this.submitting = true
-      try {
+        
+        this.submitting = true
+        
         // 构建提交数据
-        const submitData = {
-          ...this.projectForm
-        }
-         // 将 params 对象转为 JSON 字符串
-    if (submitData.params && typeof submitData.params === 'object') {
-      // 清理空值
-      const cleanedParams = {}
-      Object.keys(submitData.params).forEach(key => {
-        if (submitData.params[key] !== '' && submitData.params[key] !== null && submitData.params[key] !== undefined) {
-          cleanedParams[key] = submitData.params[key]
-        }
-      })
-      
-      // 如果 cleanedParams 有内容，转为 JSON 字符串，否则设为 null
-      if (Object.keys(cleanedParams).length > 0) {
-        submitData.params = JSON.stringify(cleanedParams)
-      } else {
-        submitData.params = null
-      }
-      
-      console.log('转换后的 params:', submitData.params)
-    }
-       
-       
+        const submitData = this.buildSubmitData()
+        console.log('提交的数据:', submitData)
         
         let response
         if (this.isEditMode) {
           response = await updateProject(this.currentProjectId, submitData)
         } else {
+          // 使用更新后的路径：/api/salary/projects/create
           response = await createProject(submitData)
         }
         
         if (response.success) {
-          this.$message.success(this.isEditMode ? '更新成功' : '创建成功')
+          this.$message.success(`${action}成功`)
           this.$router.push('/salary/projects')
+        } else {
+          this.$message.error(response.message || `${action}失败`)
         }
       } catch (error) {
-      console.error('操作失败:', error)
-    console.error('错误详情:', error.response)
-    
-    if (error.response && error.response.data) {
-      this.$message.error(error.response.data.message || error.message)
-    } else if (error.message) {
-      this.$message.error(error.message)
-    } else {
-      this.$message.error('操作失败，请检查网络连接')
-    }
+        console.error('操作失败:', error)
+        if (error !== 'cancel') {
+          const errorMsg = error.response?.data?.message || error.message || '操作失败，请检查网络连接'
+          this.$message.error(errorMsg)
+        }
       } finally {
         this.submitting = false
       }
@@ -477,6 +539,7 @@ export default {
           category: '',
           calculationMethod: '',
           sortOrder: 0,
+          status: 1,
           description: '',
           params: {
             fixedAmount: '',
@@ -492,7 +555,9 @@ export default {
     // 处理返回
     handleBack() {
       this.$router.push('/salary/projects')
-    }
+    },
+
+ 
   }
 }
 </script>

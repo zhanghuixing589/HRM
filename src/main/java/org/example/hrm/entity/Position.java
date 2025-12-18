@@ -23,6 +23,7 @@ public class Position {
   @Column(name = "orgId", nullable = false)
   private Long orgId; // 所属三级机构ID
 
+
   @Column(name = "status")
   private Integer status = 1; // 1-启用，0-禁用
 

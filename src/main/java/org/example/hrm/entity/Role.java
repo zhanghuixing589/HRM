@@ -2,6 +2,9 @@ package org.example.hrm.entity;
 
 import lombok.Data;
 import javax.persistence.*;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -40,5 +43,7 @@ public class Role {
         joinColumns = @JoinColumn(name = "role_id"),
         inverseJoinColumns = @JoinColumn(name = "menu_id")
     )
+
+    @JsonIgnore
     private List<SystemMenu> menus;
 }

@@ -16,6 +16,11 @@ public interface PositionRepository extends JpaRepository<Position, Long> {
 
   Optional<Position> findByPosCode(String posCode);
 
+  // 添加：根据ID列表查询
+    @Query("SELECT p FROM Position p WHERE p.posId IN :ids")
+    List<Position> findAllById(@Param("ids") List<Long> ids);
+ 
+
   List<Position> findByOrgId(Long orgId);
 
   List<Position> findByStatus(Integer status);
@@ -41,4 +46,20 @@ public interface PositionRepository extends JpaRepository<Position, Long> {
   // 分页查询根据机构ID列表
   @Query("SELECT p FROM Position p WHERE p.orgId IN :orgIds")
   Page<Position> findByOrgIds(@Param("orgIds") List<Long> orgIds, Pageable pageable);
+
+   // ==================== 新增方法 ====================
+
+    /**
+     * 查询所有启用的职位（状态为1）
+     */
+    @Query("SELECT p FROM Position p WHERE p.status = 1")
+    List<Position> findAllActive();
+
+    /**
+     * 根据关键字搜索启用的职位（编码或名称模糊查询）
+     */
+    @Query("SELECT p FROM Position p WHERE p.status = 1 AND (p.posCode LIKE %:keyword% OR p.posName LIKE %:keyword%)")
+    List<Position> searchActivePositions(@Param("keyword") String keyword);
+
+
 }

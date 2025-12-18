@@ -2,10 +2,11 @@
   <div class="salary-manage-container">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>薪酬管理系统</h2>
+      <h2>HRM 薪酬管理系统</h2>
       <div class="user-info">
-        <span class="username">{{ userInfo.userName || '用户' }}</span>
+        <span class="username">欢迎，{{ userInfo.userName }}</span>
         <span class="userrole">{{ userRole }}</span>
+        <el-button type="text" @click="logout">退出</el-button>
       </div>
     </div>
 
@@ -39,6 +40,7 @@
             icon="el-icon-plus"
             @click="goToCreateProject"
             size="medium"
+              v-if="userInfo.roleType === 3"  
           >
             新建项目
           </el-button>
@@ -72,8 +74,9 @@
             type="warning" 
             icon="el-icon-edit"
             @click="handleEditStandards"
-            v-if="userInfo.roleType === 3"  
+          
             size="medium"
+          v-if="userInfo.roleType === 1 || userInfo.roleType === 5"
           >
             编辑标准
           </el-button>
@@ -188,6 +191,11 @@ export default {
         this.userInfo = JSON.parse(userData)
       }
     },
+
+   logout () {
+      localStorage.clear()
+      this.$router.replace('/')
+    },
     
     // 跳转到薪酬项目管理
     goToProjects() {
@@ -206,7 +214,7 @@ export default {
     
     // 编辑薪酬标准
     handleEditStandards() {
-      this.$router.push('/salary/standards/edit')
+      this.$router.push('/salary/standards/create/')
     },
     
     // 跳转到薪酬发放

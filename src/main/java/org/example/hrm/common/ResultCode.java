@@ -47,7 +47,9 @@ public enum ResultCode {
 
      /* 机构职位相关 */
     ORG_NOT_EXIST(6001, "机构不存在"),
-    POSITION_NOT_EXIST(6002, "职位不存在");
+    POSITION_NOT_EXIST(6002, "职位不存在"), 
+    POSITION_LESS(6003,"职位没有关联"),
+    PARAM_ERROR(3009,"必须为增项或者减项");
 
     private final Integer code;
     private final String message;

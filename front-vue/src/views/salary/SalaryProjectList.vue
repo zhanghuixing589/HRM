@@ -3,10 +3,10 @@
     <div class="page-header">
       <h2>薪酬项目管理</h2>
       <div class="header-actions">
-        <el-button type="primary" icon="el-icon-plus" @click="handleCreate">
+        <el-button type="primary" icon="el-icon-plus" @click="handleCreate" v-if="[3,1].includes(userInfo.roleType)"  >
           新增项目
         </el-button>
-        <el-button :disabled="!selectedRows.length" @click="handleBatchDelete">
+        <el-button :disabled="!selectedRows.length" @click="handleBatchDelete" v-if="[3,1].includes(userInfo.roleType)">
           批量删除
         </el-button>
         <el-button icon="el-icon-refresh" @click="fetchProjectList">
@@ -44,6 +44,18 @@
             />
           </el-select>
         </el-form-item>
+        <!-- 在搜索表单中添加 -->
+<el-form-item label="状态">
+  <el-select
+    v-model="searchForm.status"
+    placeholder="请选择状态"
+    clearable
+    @change="handleSearch"
+  >
+    <el-option label="启用" :value="1" />
+    <el-option label="禁用" :value="0" />
+  </el-select>
+</el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
@@ -76,20 +88,38 @@
         <el-table-column prop="category" label="项目类别" width="120" />
         <el-table-column prop="calculationMethod" label="计算方法" width="120" />
         <el-table-column prop="sortOrder" label="排序顺序" width="100" align="center" />
+        <el-table-column prop="status" label="状态" width="80" align="center">
+          <template slot-scope="scope">
+            <el-tag
+              :type="scope.row.status === 1 ? 'success' : 'danger'"
+              size="small"
+            >
+              {{ scope.row.status === 1 ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="createdAt" label="创建时间" width="180">
           <template slot-scope="scope">
             {{ formatDate(scope.row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right" v-if="[3,1].includes(userInfo.roleType)">
           <template slot-scope="scope">
             <el-button
               type="text"
               size="small"
-              @click="handleEdit(scope.row)"
+              @click="handleEdit(scope.row)" v-if="[3,1].includes(userInfo.roleType)"
             >
               编辑
+            </el-button>
+            <el-button
+              type="text"
+              size="small"
+              @click="scope.row.status === 1 ? handleDisable(scope.row) : handleEnable(scope.row)"
+              :style="scope.row.status === 1 ? 'color: #f56c6c' : 'color: #67c23a'" v-if="[3,1].includes(userInfo.roleType)"
+            >
+              {{ scope.row.status === 1 ? '禁用' : '启用' }}
             </el-button>
             <el-button
               type="text"
@@ -124,7 +154,9 @@ import {
   getAllProjects,
   deleteProject,
   batchDeleteProjects,
-  getProjectEnums
+  getProjectEnums,
+  enableProject,
+  disableProject
 } from '@/api/salary/projects'
 
 export default {
@@ -134,7 +166,8 @@ export default {
       // 搜索表单
       searchForm: {
         projectName: '',
-        projectType: null
+        projectType: null,
+        status: null
       },
       
       // 表格数据
@@ -149,20 +182,47 @@ export default {
         pageSize: 10,
         total: 0
       },
-      
+        userInfo: {},
       // 枚举数据
       projectTypes: [],
       projectCategories: [],
       calculationMethods: []
+    }
+  
+  },
+
+  computed: {
+    userRole() {
+      const roleMap = {
+        1: '系统管理员',
+        2: '人事经理',
+        3: '薪酬经理',
+        4: '人事专员',
+        5: '薪酬专员',
+        6: '普通员工'
+      }
+      return roleMap[this.userInfo.roleType] || '用户'
     }
   },
   
   created() {
     this.fetchEnums()
     this.fetchProjectList()
+    this.loadUserInfo()
   },
   
   methods: {
+    //加载用户信息
+    loadUserInfo() {
+      const data = localStorage.getItem('user')
+      if(data){
+        this.userInfo = JSON.parse(data)
+      }
+    },
+    logout(){
+      localStorage.clear()
+      this.$router.replace('/')
+    },
     // 获取枚举数据
     async fetchEnums() {
       try {
@@ -181,15 +241,6 @@ export default {
     async fetchProjectList() {
       this.loading = true
       try {
-        // 尝试清理无效token
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-    if (token && token.includes('�') || token.length < 10) { // 简单检查token是否损坏
-      console.warn('检测到可能损坏的token，正在清理...')
-      localStorage.removeItem('token')
-      sessionStorage.removeItem('token')
-      window.location.reload()
-      return
-    }
         const response = await getAllProjects()
         
         console.log('API响应:', response)
@@ -232,6 +283,12 @@ export default {
         )
       }
       
+      if (this.searchForm.status !== null) {
+        filteredData = filteredData.filter(item => 
+          item.status === this.searchForm.status
+        )
+      }
+      
       // 2. 更新总记录数
       this.pagination.total = filteredData.length
       
@@ -261,7 +318,8 @@ export default {
     handleReset() {
       this.searchForm = {
         projectName: '',
-        projectType: null
+        projectType: null,
+        status: null
       }
       this.pagination.pageNum = 1
       this.applyFilterAndPagination()
@@ -280,7 +338,7 @@ export default {
       })
     },
 
-    //处理返回
+    // 处理返回
     handleBack() {
       this.$router.push('/salary/manage')
     },
@@ -300,11 +358,39 @@ export default {
           }
         } catch (error) {
           console.error('删除失败:', error)
-          this.$message.error('删除失败')
+          this.$message.error(error.response?.data?.message || '删除失败')
         }
       }).catch(() => {
         console.log('用户取消了删除操作')
       })
+    },
+    
+    // 处理启用
+    async handleEnable(row) {
+      try {
+        const response = await enableProject(row.projectId)
+        if (response.success) {
+          this.$message.success('启用成功')
+          this.fetchProjectList()
+        }
+      } catch (error) {
+        console.error('启用失败:', error)
+        this.$message.error(error.response?.data?.message || '启用失败')
+      }
+    },
+    
+    // 处理禁用
+    async handleDisable(row) {
+      try {
+        const response = await disableProject(row.projectId)
+        if (response.success) {
+          this.$message.success('禁用成功')
+          this.fetchProjectList()
+        }
+      } catch (error) {
+        console.error('禁用失败:', error)
+        this.$message.error(error.response?.data?.message || '禁用失败')
+      }
     },
     
     // 处理批量删除
@@ -329,7 +415,7 @@ export default {
           }
         } catch (error) {
           console.error('批量删除失败:', error)
-          this.$message.error('批量删除失败')
+          this.$message.error(error.response?.data?.message || '批量删除失败')
         }
       }).catch(() => {
         console.log('用户取消了删除操作')
