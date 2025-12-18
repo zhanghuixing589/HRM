@@ -60,7 +60,7 @@ public class ArchiveController {
    * 复核档案（人事经理）
    */
   @PostMapping("/review")
-  @PreAuthorize("hasRole('HR_MANAGER')")
+  // @PreAuthorize("hasRole('HR_MANAGER')")
   public Result<Archive> reviewArchive(@RequestBody ReviewDTO reviewDTO,
       @RequestAttribute Long userId) {
     try {

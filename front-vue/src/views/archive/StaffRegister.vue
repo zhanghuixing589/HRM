@@ -72,14 +72,6 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <!-- <el-col :span="8">
-            <el-form-item label="薪酬标准" prop="salaryStandard">
-              <el-select v-model="dto.salaryStandard" placeholder="请选择薪酬标准" clearable>
-                <el-option v-for="standard in salaryStandardList" :key="standard.standardId"
-                  :label="`${standard.standardName} (${standard.standardCode})`" :value="standard.standardId" />
-              </el-select>
-            </el-form-item>
-          </el-col> -->
           <el-col :span="8">
             <el-form-item label="薪酬标准" prop="salaryStandard">
               <el-select 
@@ -87,20 +79,16 @@
                 placeholder="请选择薪酬标准" 
                 clearable
                 :disabled="!showSalaryStandards || salaryStandardList.length === 0"
-                :loading="salaryStandardLoading"
                 filterable
                 style="width: 100%;"
               >
                 <el-option 
                   v-for="standard in salaryStandardList" 
                   :key="standard.standardId" 
-                  :label="`${standard.standardName} (${standard.standardCode})`" 
+                  :label="`${standard.standardName}`" 
                   :value="standard.standardId" 
                 />
               </el-select>
-              <div v-if="showSalaryStandards && salaryStandardList.length === 0" style="color: #f56c6c; font-size: 12px; margin-top: 5px;">
-                未找到符合条件的薪酬标准，请检查职位和职称设置
-              </div>
             </el-form-item>
           </el-col>
           
@@ -327,7 +315,7 @@ export default {
       thirdList: [],
       positionList: [],
       salaryStandardList: [],
-      uploadUrl: process.env.VUE_APP_BASE_API + '/common/upload',
+      uploadUrl: 'http://localhost:8080/common/upload',
       uploadHeaders: {
         Authorization: localStorage.getItem('token') || ''
       }
@@ -403,7 +391,7 @@ export default {
         firstOrgId: archive.firstOrgId || '',
         secondOrgId: archive.secondOrgId || '',
         thirdOrgId: archive.thirdOrgId || '',
-        positionId: '', // 需要根据职位名称查找职位ID
+        positionId: '', 
         positionName: archive.positionName || '',
         title: archive.title || '',
         salaryStandard: archive.salaryStandard || '',
@@ -547,32 +535,6 @@ export default {
       await this.loadPositions()
     },
 
-    // 加载职位
-    // async loadPositions() {
-    //   try {
-    //     const response = await listByOrg(this.dto.thirdOrgId)
-    //     if (response && response.code === 200) {
-    //       this.positionList = response.data
-    //       console.log('职位列表:', this.positionList)
-
-    //       // 如果是重新提交模式，找到对应的职位ID
-    //       if (this.isResubmitMode && this.dto.positionName) {
-    //         const position = this.positionList.find(p => p && p.posName === this.dto.positionName)
-    //         if (position) {
-    //           this.dto.positionId = position.posId
-    //         }
-    //       }
-    //     } else {
-    //       this.positionList = []
-    //       const errorMessage = response ? response.message : '获取职位数据失败'
-    //       this.$message.error(errorMessage)
-    //     }
-    //   } catch (error) {
-    //     console.error('加载职位失败:', error)
-    //     this.positionList = []
-    //     this.$message.error('加载职位失败')
-    //   }
-    // },
     async loadPositions() {
       try {
         const response = await listByOrg(this.dto.thirdOrgId)
@@ -585,6 +547,8 @@ export default {
             const position = this.positionList.find(p => p && p.posName === this.dto.positionName)
             if (position) {
               this.dto.positionId = position.posId
+              this.showSalaryStandards = true
+              await this.loadSalaryStandards(this.dto.positionId, '')
               
               // 如果已经有职称，加载薪酬标准
               if (this.dto.title) {
@@ -605,7 +569,7 @@ export default {
     },
 
     // 职位变化
-    handlePositionChange(positionId) {
+    async handlePositionChange(positionId) {
       this.dto.positionName = ''
       this.dto.title = ''
       this.dto.salaryStandard = ''
@@ -617,6 +581,10 @@ export default {
       const selectedPosition = this.positionList.find(p => p && p.posId === positionId)
       if (selectedPosition) {
         this.dto.positionName = selectedPosition.posName
+
+        // 职位选择后，立即加载与该职位关联的所有薪酬标准（即使职称为空）
+        this.showSalaryStandards = true
+        await this.loadSalaryStandards(positionId, '') // 传递空职称
       }
       this.loadSalaryStandards(positionId, null)
 
@@ -630,7 +598,7 @@ export default {
     async handleTitleChange() {
       this.dto.salaryStandard = ''
 
-      // 只有选择了职位和职称才显示薪酬标准
+      // 通过职位和职称显示薪酬标准
       if (this.dto.positionId && this.dto.title) {
         this.showSalaryStandards = true
         await this.loadSalaryStandards(this.dto.positionId, this.dto.title)

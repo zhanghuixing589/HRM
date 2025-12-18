@@ -127,7 +127,7 @@
             {{ row.title }}
           </el-descriptions-item>
           <el-descriptions-item label="薪酬标准" label-class-name="desc-label">
-            {{ row.salaryStandardName || row.salaryStandard }}
+            {{ row.salaryStandardName || row.salaryStandard || '--'}}
           </el-descriptions-item>
           <el-descriptions-item label="出生日期" label-class-name="desc-label">
             {{ row.birDate }}
@@ -213,8 +213,8 @@
 </template>
 
 <script>
-import { getMyArchives } from '@/api/archive'
-import { getArchiveProcess } from '@/api/archive'
+import { getMyArchives, getArchiveProcess } from '@/api/archive'
+import { getAllActiveSalaryStandards } from '@/api/archiveSalary'
 
 export default {
   name: 'MyArchives',
@@ -406,6 +406,22 @@ export default {
         console.error('获取审核进度失败:', error)
         this.$message.error('获取审核进度失败')
       })
+
+      // 如果后端没有返回薪酬标准名称，则尝试获取
+      if (row.salaryStandard && !row.salaryStandardName) {
+        try {
+          const response = await getAllActiveSalaryStandards()
+          if (response && response.code === 200) {
+            const standards = response.data || []
+            const standard = standards.find(s => s.standardId == row.salaryStandard)
+            if (standard) {
+              this.row.salaryStandardName = standard.standardName
+            }
+          }
+        } catch (error) {
+          console.error('获取薪酬标准名称失败:', error)
+        }
+      }
     },
 
     // 获取机构路径

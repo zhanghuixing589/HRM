@@ -132,4 +132,15 @@ public class Archive {
   @Transient
   private String salaryStandardName;
 
+  @Transient
+  private Long positionId;
+
+  public Long getPositionId() {
+    return positionId;
+  }
+
+  public void setPositionId(Long positionId) {
+    this.positionId = positionId;
+  }
+
 }

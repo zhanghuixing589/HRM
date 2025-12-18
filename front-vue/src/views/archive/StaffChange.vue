@@ -82,9 +82,10 @@
 
         <el-row :gutter="20">
           <el-col :span="8">
-            <!-- 职称 -->
             <el-form-item label="职称" prop="title">
-              <el-select v-model="dto.title" style="width: 100%" placeholder="请选择职称">
+              <el-select v-model="dto.title"
+                        placeholder="请选择职称"
+                        @change="handleTitleChange">   <!-- 关键事件 -->
                 <el-option label="初级" value="初级" />
                 <el-option label="中级" value="中级" />
                 <el-option label="高级" value="高级" />
@@ -93,9 +94,17 @@
           </el-col>
 
           <el-col :span="8">
-            <!-- 薪酬标准 -->
             <el-form-item label="薪酬标准" prop="salaryStandard">
-              <el-input v-model="dto.salaryStandard" clearable placeholder="请输入薪酬标准" />
+              <el-select v-model="dto.salaryStandard"
+                        placeholder="请选择薪酬标准"
+                        clearable
+                        filterable
+                        style="width: 100%;">
+                <el-option v-for="item in salaryStandardList"
+                          :key="item.standardId"
+                          :label="item.standardName" 
+                          :value="item.standardId" />   <!-- 提交 ID -->
+              </el-select>
             </el-form-item>
           </el-col>
 
@@ -228,7 +237,7 @@
 <script>
 import { getArchiveDetail } from '@/api/archive'
 import { applyArchiveChange, resubmitChange, getChangeDetail } from '@/api/change'
-import { getSalaryStandardsByPosition } from '@/api/archiveSalary'
+import { getSalaryStandardsByPosition, getAllActiveSalaryStandards } from '@/api/archiveSalary'
 
 export default {
   name: 'StaffChange',
@@ -288,6 +297,8 @@ export default {
       // 薪酬标准相关
       showSalaryStandards: false,
       salaryStandardList: [],
+      salaryStandardMap: {},
+      salaryStandardLoading: false,
 
       uploadUrl: process.env.VUE_APP_BASE_API + '/common/upload',
       uploadHeaders: {
@@ -333,6 +344,7 @@ export default {
         const response = await getArchiveDetail(arcId)
         if (response && (response.code === 200 || response.success)) {
           this.archiveData = response.data || response
+          console.log(this.archiveData)
 
           // 检查档案状态是否为已通过（只有已通过的档案才能变更）
           if (this.archiveData.status !== 2) {
@@ -380,16 +392,16 @@ export default {
     },
 
     // 初始化表单数据
-    initFormData(changeData) {
+    async initFormData(changeData) {
       if (!this.archiveData) return
 
-      // 从档案数据复制到表单
+      // 1) 基本字段拷贝（你原来已有）
       this.dto = {
         name: this.archiveData.name || '',
         sex: this.archiveData.sex || 1,
         idCard: this.archiveData.idCard || '',
         title: this.archiveData.title || '',
-        salaryStandard: this.archiveData.salaryStandard || '',
+        salaryStandard: this.archiveData.salaryStandardName || '', // 此时还是 ID
         birDate: this.archiveData.birDate || '',
         nationality: this.archiveData.nationality || '',
         qualification: this.archiveData.qualification || '',
@@ -406,51 +418,90 @@ export default {
         photoPath: this.archiveData.photoPath || '',
         changeReason: ''
       }
+      this.archiveData.positionId = this.archiveData.positionId || this.archiveData.posId || null
 
-      // 如果有职称，加载薪酬标准
-      if (this.dto.title) {
-        this.loadSalaryStandardsForChange()
-      }   
+      // 2) 第一次就把下拉框数据源拉回来（关键！）
+      await this.loadSalaryStandards()
 
-      // 如果有变更数据，使用变更后的数据
+      // 3) 如果有“变更后数据”(重新提交场景)，再用变更后数据覆盖一次
       if (changeData && changeData.afterDataParsed) {
-        const afterData = changeData.afterDataParsed
+        const after = changeData.afterDataParsed
         Object.keys(this.dto).forEach(key => {
-          if (afterData[key] !== undefined && afterData[key] !== null) {
-            this.dto[key] = afterData[key]
+          if (after[key] !== undefined && after[key] !== null) {
+            this.dto[key] = after[key]
           }
         })
-
-        // 如果changeData有changeReason，也赋值
-        if (changeData.changeReason) {
-          this.dto.changeReason = changeData.changeReason
+        if (after.salaryStandard) {
+          // 变更后可能换了标准，再补一次映射
+          await this.loadSalaryStandards()
         }
       }
     },
 
     // 职称变化
-    async handleTitleChange() {
-      this.dto.salaryStandard = ''
-      
-      if (this.dto.title) {
-        this.showSalaryStandards = true
-        await this.loadSalaryStandardsForChange()
+    handleTitleChange() {
+      this.dto.salaryStandard = ''   // 清空旧选中
+      this.loadSalaryStandards()
+    },
+
+    async loadSalaryStandards() {
+      if (!this.dto.title) {          // 没选职称就清空
+        this.salaryStandardList = []
+        return
+      }
+
+      console.log('【请求参数】positionId:', this.archiveData.positionId,
+              'title:', this.dto.title,
+        'archiveData:', this.archiveData)
+              
+      const res = await getSalaryStandardsByPosition(
+        this.archiveData.positionId,
+        this.dto.title
+      )
+
+      console.log('【后端返回】', res)
+       
+      if (res && res.code === 200) {
+        this.salaryStandardList = res.data || []
+        // 同步建 id→name 映射，方便下拉框显示
+        this.salaryStandardMap = {}
+        this.salaryStandardList.forEach(item => {
+          this.salaryStandardMap[item.standardId] = item.standardName
+        })
       } else {
-        this.showSalaryStandards = false
         this.salaryStandardList = []
       }
     },
-    
+
+    async getPositionIdByName(name) {
+      const map = { '总经理': 1, '副总经理': 2, '部门经理': 3, '主管': 4, '专员': 5, '助理': 6 };
+      return map[name] || null;
+    },
+    // 4. 初始化时把“初始薪酬标准 ID → 名称”反解出来
+    async initSalaryStandardName() {
+      if (!this.dto.salaryStandard) return;          // 没有值直接返回
+      // 如果档案里已经带了名称就直接用
+      if (this.archiveData.salaryStandardName) {
+        this.salaryStandardMap[this.dto.salaryStandard] = this.archiveData.salaryStandardName;
+        return;
+      }
+      // 否则拉一次全量映射
+      const res = await getAllActiveSalaryStandards();
+      (res?.data || []).forEach(s => {
+        this.salaryStandardMap[s.standardId] = s.standardName;
+      });
+    },
+
     // 加载变更页面的薪酬标准
     async loadSalaryStandardsForChange() {
       try {
         if (!this.archiveData) return
-        
+
         const response = await getSalaryStandardsByPosition(
           this.getPositionIdFromName(this.archiveData.positionName),
           this.dto.title
         )
-        
+
         if (response && response.code === 200) {
           this.salaryStandardList = response.data || []
         } else {
@@ -565,7 +616,7 @@ export default {
           console.log('重新提交-变更前数据:', changeData.beforeDataParsed)
           console.log('重新提交-变更后数据:', changeData.afterDataParsed)
           console.log('重新提交-变更字段:', changeData.changedFieldsParsed)
-          
+
           // 初始化表单数据
           this.initFormData(changeData)
         }
