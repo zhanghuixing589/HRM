@@ -374,18 +374,18 @@
           <el-descriptions-item label="出生日期">{{ currentArchive.birDate }}</el-descriptions-item>
           <el-descriptions-item label="民族">{{ currentArchive.nationality }}</el-descriptions-item>
           <el-descriptions-item label="学历">{{ currentArchive.qualification }}</el-descriptions-item>
-          <el-descriptions-item label="政治面貌">{{ currentArchive.identity }}</el-descriptions-item>
-          <el-descriptions-item label="宗教信仰">{{ currentArchive.belief }}</el-descriptions-item>
-          <el-descriptions-item label="一级机构">{{ currentArchive.firstOrgName }}</el-descriptions-item>
+          <el-descriptions-item label="政治面貌">{{ currentArchive.identity }}</el-descriptions-item>          <el-descriptions-item label="一级机构">{{ currentArchive.firstOrgName }}</el-descriptions-item>
           <el-descriptions-item label="二级机构">{{ currentArchive.secondOrgName }}</el-descriptions-item>
           <el-descriptions-item label="三级机构">{{ currentArchive.thirdOrgName }}</el-descriptions-item>
           <el-descriptions-item label="职位">{{ currentArchive.positionName }}</el-descriptions-item>
           <el-descriptions-item label="职称">{{ currentArchive.title }}</el-descriptions-item>
+          <el-descriptions-item label="薪酬标准">{{ currentArchive.salaryStandardName || currentArchive.salaryStandard || '--' }}</el-descriptions-item>
           <el-descriptions-item label="手机">{{ currentArchive.phone }}</el-descriptions-item>
           <el-descriptions-item label="Email">{{ currentArchive.email }}</el-descriptions-item>
           <el-descriptions-item label="住址">{{ currentArchive.address }}</el-descriptions-item>
           <el-descriptions-item label="国籍">{{ currentArchive.country }}</el-descriptions-item>
           <el-descriptions-item label="出生地">{{ currentArchive.birAddress }}</el-descriptions-item>
+          <el-descriptions-item label="宗教信仰">{{ currentArchive.belief }}</el-descriptions-item>
           <el-descriptions-item label="邮编">{{ currentArchive.zipCode }}</el-descriptions-item>
           <el-descriptions-item label="专业">{{ currentArchive.major }}</el-descriptions-item>
           <el-descriptions-item label="登记人">{{ currentArchive.writerName }}</el-descriptions-item>
@@ -444,6 +444,7 @@
 
 <script>
 import { queryArchives, reviewArchive, deleteArchive, restoreArchive, getArchiveDetail, getArchiveProcess } from '@/api/archive'
+import { getAllActiveSalaryStandards } from '@/api/archiveSalary'
 
 export default {
   name: 'RegisterCheck',
@@ -799,6 +800,23 @@ export default {
         const detailResponse = await getArchiveDetail(row.arcId)
         if (detailResponse && detailResponse.code === 200) {
           this.currentArchive = detailResponse.data
+
+          // 如果后端没有返回薪酬标准名称，则尝试获取
+          if (this.currentArchive.salaryStandard && !this.currentArchive.salaryStandardName) {
+            try {
+              const salaryResponse = await getAllActiveSalaryStandards()
+              if (salaryResponse && salaryResponse.code === 200) {
+                const standards = salaryResponse.data || []
+                const standard = standards.find(s => s.standardId == this.currentArchive.salaryStandard)
+                if (standard) {
+                  this.currentArchive.salaryStandardName = standard.standardName
+                }
+              }
+            } catch (error) {
+              console.error('获取薪酬标准名称失败:', error)
+            }
+          }
+
         } else {
           this.$message.error('获取档案详情失败')
           return

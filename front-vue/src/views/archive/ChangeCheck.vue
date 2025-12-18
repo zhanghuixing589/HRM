@@ -182,9 +182,11 @@
 
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="薪酬标准">
-                <el-input v-model="reviewForm.salaryStandard" placeholder="请输入薪酬标准" />
-              </el-form-item>
+              <el-descriptions-item label="薪酬标准">
+                <span style="color: #606266; font-weight: 500;">
+                  {{ currentChange.afterDataParsed?.salaryStandardName || currentChange.afterDataParsed?.salaryStandard || '--' }}
+                </span>
+              </el-descriptions-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="出生日期">
@@ -376,14 +378,14 @@
           <el-table-column label="变更前" min-width="200" align="center" header-align="center">
             <template slot-scope="{ row }">
               <div style="background: #f0f9eb; padding: 5px 10px; border-radius: 3px; color: #67c23a;">
-                {{ row.beforeValue || '空' }}
+                {{ formatFieldDisplayValue(row.field, row.beforeValue) }}
               </div>
             </template>
           </el-table-column>
           <el-table-column label="变更后" min-width="200" align="center" header-align="center">
             <template slot-scope="{ row }">
               <div style="background: #ecf5ff; padding: 5px 10px; border-radius: 3px; color: #409eff;">
-                {{ row.afterValue || '空' }}
+                {{ formatFieldDisplayValue(row.field, row.afterValue) }}
               </div>
             </template>
           </el-table-column>
@@ -426,6 +428,7 @@
 
 <script>
 import { reviewChange, getChangeDetail, getChangeProcess, queryChanges } from '@/api/change'
+import { getAllActiveSalaryStandards } from '@/api/archiveSalary'
 
 export default {
   name: 'ChangeCheck',
@@ -454,11 +457,13 @@ export default {
       // 详情相关
       detailDialogVisible: false,
       currentChange: null,
-      processList: []
+      processList: [],
+      salaryStandardMap: {}
     }
   },
   created() {
     this.loadData()
+    this.loadSalaryStandards()
   },
   methods: {
     // 格式化日期
@@ -850,6 +855,40 @@ export default {
       }
     },
 
+    // 加载薪酬标准映射
+    async loadSalaryStandards() {
+      try {
+        const response = await getAllActiveSalaryStandards()
+        if (response && response.code === 200) {
+          const standards = response.data || []
+          standards.forEach(standard => {
+            this.salaryStandardMap[standard.standardId] = standard.standardName
+          })
+        }
+      } catch (error) {
+        console.error('加载薪酬标准失败:', error)
+      }
+    },
+    
+    // 格式化字段显示值
+    formatFieldDisplayValue(field, value) {
+      if (value === null || value === undefined || value === '空') {
+        return '空'
+      }
+      
+      // 特殊字段处理
+      if (field === 'sex') {
+        return value === 1 ? '男' : value === 2 ? '女' : value
+      }
+      
+      // 薪酬标准字段：显示名称而不是ID
+      if (field === 'salaryStandard') {
+        return this.salaryStandardMap[value] || value || '空'
+      }
+      
+      return String(value)
+    },
+
     // 显示详情
     async showDetail(row) {
       try {
@@ -857,16 +896,36 @@ export default {
         this.currentChange = null
         this.processList = []
 
+        // 立即把薪酬标准ID映射名称
+        if (row.afterDataParsed?.salaryStandard) {
+          const id = row.afterDataParsed.salaryStandard
+          row.afterDataParsed.salaryStandardName = this.salaryStandardMap[id] || id
+        }
+        if (row.beforeDataParsed?.salaryStandard) {
+          const id = row.beforeDataParsed.salaryStandard
+          row.beforeDataParsed.salaryStandardName = this.salaryStandardMap[id] || id
+        }
+
         // 获取变更详情
         const detailResponse = await getChangeDetail(row.changeId)
         if (detailResponse && detailResponse.code === 200) {
           this.currentChange = detailResponse.data
+
+          // 再给currentChange补一次名称
+          const after = this.currentChange.afterDataParsed || {}
+          const before = this.currentChange.beforeDataParsed || {}
+          if (after.salaryStandard) {
+            after.salaryStandardName = this.salaryStandardMap[after.salaryStandard] || after.salaryStandard
+          }
+          if (before.salaryStandard) {
+            before.salaryStandardName = this.salaryStandardMap[before.salaryStandard] || before.salaryStandard
+          }
         } else {
           this.$message.error('获取变更详情失败')
           return
         }
 
-        // 获取审核流程
+        // 审核流程
         const processResponse = await getChangeProcess(row.changeId)
         if (processResponse && processResponse.code === 200) {
           this.processList = processResponse.data
@@ -896,15 +955,19 @@ export default {
       const afterData = this.currentChange.afterDataParsed || {}
 
       return changedFields.map(field => {
-        const beforeValue = this.formatFieldValue(field, beforeData[field])
-        const afterValue = this.formatFieldValue(field, afterData[field])
-        const isChanged = beforeValue !== afterValue
+        let beforeValue = beforeData[field]
+        let afterValue = afterData[field]
+
+        // 特殊处理薪酬标准字段
+        if (field === 'salaryStandard') {
+          beforeValue = beforeData.salaryStandardName || beforeValue
+          afterValue = afterData.salaryStandardName || afterValue
+        }
 
         return {
           field: field,
-          beforeValue: beforeValue,
-          afterValue: afterValue,
-          changed: isChanged
+          beforeValue: beforeValue === null || beforeValue === undefined ? '空' : String(beforeValue),
+          afterValue: afterValue === null || afterValue === undefined ? '空' : String(afterValue)
         }
       })
     },

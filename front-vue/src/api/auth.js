@@ -68,4 +68,8 @@ export const logout = () => {
   return api.post('/auth/logout')
 }
 
+export function changePassword(data) {
+  return api.post('/auth/changePwd', data)
+}
+
 export default api

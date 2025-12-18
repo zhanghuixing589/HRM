@@ -2,7 +2,9 @@ package org.example.hrm.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.hrm.common.Result;
+import org.example.hrm.dto.ChangePwdRequest;
 import org.example.hrm.entity.User;
+import org.example.hrm.repository.UserRepository;
 import org.example.hrm.util.JwtTokenUtil;
 import org.example.hrm.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +14,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 import java.util.HashMap;
@@ -22,35 +25,39 @@ import java.util.Map;
 @CrossOrigin
 @Slf4j
 public class AuthController {
-    
+
     @Autowired
     private AuthenticationManager authenticationManager;
-    
+
     @Autowired
     private JwtTokenUtil jwtTokenUtil;
-    
+
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         try {
             // 验证用户名密码
             Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                    loginRequest.getUsername(),
-                    loginRequest.getPassword()
-                )
-            );
-            
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsername(),
+                            loginRequest.getPassword()));
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            
+
             // 获取用户信息
             User user = userService.findByUserCode(loginRequest.getUsername());
             if (user == null) {
                 return ResponseEntity.badRequest().body(Result.error("用户不存在"));
             }
-            
+
             if (user.getStatus() == 0) {
                 return ResponseEntity.badRequest().body(Result.error("用户已离职"));
             }
@@ -58,12 +65,12 @@ public class AuthController {
             if (user.getStatus() == 2) {
                 return ResponseEntity.badRequest().body(Result.error("用户已禁用"));
             }
-            
+
             // 生成JWT token
             final UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            
+
             final String token = jwtTokenUtil.generateToken(userDetails, user.getRoleType(), user.getUserId());
-            
+
             // 构建返回结果
             Map<String, Object> result = new HashMap<>();
             result.put("token", jwtTokenUtil.getTokenPrefix() + token);
@@ -72,38 +79,38 @@ public class AuthController {
             result.put("redirectUrl", getRedirectUrl(user.getRoleType()));
 
             return ResponseEntity.ok(Result.success(result));
-            
+
         } catch (Exception e) {
-            e.printStackTrace();  // 确保控制台也打印
+            e.printStackTrace(); // 确保控制台也打印
             return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
         }
     }
-    
+
     @GetMapping("/userinfo")
     public ResponseEntity<?> getUserInfo(@RequestHeader("Authorization") String token) {
         try {
             if (token.startsWith(jwtTokenUtil.getTokenPrefix())) {
                 token = token.substring(jwtTokenUtil.getTokenPrefix().length());
             }
-            
+
             String username = jwtTokenUtil.getUsernameFromToken(token);
             User user = userService.findByUserCode(username);
-            
+
             if (user == null) {
                 return ResponseEntity.badRequest().body(Result.error("用户不存在"));
             }
-            
+
             Map<String, Object> result = new HashMap<>();
             result.put("user", user);
             result.put("roleType", user.getRoleType());
-            
+
             return ResponseEntity.ok(Result.success(result));
-            
+
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Result.error("获取用户信息失败"));
         }
     }
-    
+
     // 根据角色类型返回跳转路径
     private String getRedirectUrl(Integer roleType) {
         switch (roleType) {
@@ -121,27 +128,52 @@ public class AuthController {
                 return "/";
         }
     }
-    
+
     // 登录请求类
     public static class LoginRequest {
         private String username;
         private String password;
-        
+
         // getters and setters
         public String getUsername() {
             return username;
         }
-        
+
         public void setUsername(String username) {
             this.username = username;
         }
-        
+
         public String getPassword() {
             return password;
         }
-        
+
         public void setPassword(String password) {
             this.password = password;
+        }
+    }
+
+    @PostMapping("/changePwd")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> dto) {
+        log.info("收到修改密码参数：{}", dto);
+
+        String username = dto.get("username");
+        String oldPwd = dto.get("oldPassword");
+        String newPwd = dto.get("newPassword");
+
+        try {
+            User user = userService.findByUserCode(username);
+            if (user == null) {
+                return ResponseEntity.badRequest().body(Result.error("用户不存在"));
+            }
+            if (!passwordEncoder.matches(oldPwd, user.getPassword())) {
+                return ResponseEntity.badRequest().body(Result.error("原始密码错误"));
+            }
+            user.setPassword(passwordEncoder.encode(newPwd));
+            userRepository.save(user); // 直接落库
+            return ResponseEntity.ok(Result.success("密码修改成功"));
+        } catch (Exception e) {
+            log.error("修改密码失败", e);
+            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
         }
     }
 }

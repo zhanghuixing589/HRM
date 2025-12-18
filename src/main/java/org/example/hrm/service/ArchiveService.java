@@ -8,11 +8,14 @@ import org.example.hrm.entity.Archive;
 import org.example.hrm.entity.ArchiveOperation;
 import org.example.hrm.entity.ArchiveStandard;
 import org.example.hrm.entity.Organization;
+import org.example.hrm.entity.Position;
 import org.example.hrm.entity.User;
 import org.example.hrm.exception.BusinessException;
 import org.example.hrm.repository.ArchiveOperationRepository;
 import org.example.hrm.repository.ArchiveRepository;
+import org.example.hrm.repository.ArchiveStandardRepository;
 import org.example.hrm.repository.OrganizationRepository;
+import org.example.hrm.repository.PositionRepository;
 import org.example.hrm.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -48,6 +51,9 @@ public class ArchiveService {
   private OrganizationRepository organizationRepository;
 
   @Autowired
+  private PositionRepository positionRepository; 
+
+  @Autowired
   private UserRepository userRepository;
 
   @Autowired
@@ -55,6 +61,9 @@ public class ArchiveService {
 
   @Autowired
   private ArchiveSalaryService archiveSalaryService;
+
+  @Autowired
+  private ArchiveStandardRepository archiveStandardRepository;
 
   // 生成档案编码
   private String generateArcCode(Long thirdOrgId) {
@@ -406,6 +415,18 @@ public class ArchiveService {
     // 补充人员姓名
     enrichArchiveWithUserNames(archive);
 
+    // 补充薪酬姓名
+    enrichArchiveWithSalaryStandardName(archive);
+
+    if (StringUtils.hasText(archive.getPositionName()) && archive.getThirdOrgId() != null) {
+        // 根据三级机构 + 职位名称 反查职位 ID
+        List<Position> posList = positionRepository.findByOrgIdAndPosName(
+                archive.getThirdOrgId(), archive.getPositionName());
+        if (!posList.isEmpty()) {
+            archive.setPositionId(posList.get(0).getPosId());   // 只放内存，不保存 DB
+        }
+    }
+
     return archive;
   }
 
@@ -418,6 +439,7 @@ public class ArchiveService {
     page.getContent().forEach(archive -> {
       enrichArchiveWithOrgNames(archive);
       enrichArchiveWithUserNames(archive);
+      enrichArchiveWithSalaryStandardName(archive);
     });
 
     return page;
@@ -625,6 +647,21 @@ public class ArchiveService {
     }
   }
 
+  // 补充薪酬标准名称
+  private void enrichArchiveWithSalaryStandardName(Archive archive) {
+    try {
+      if (archive.getSalaryStandard() != null) {
+        Optional<ArchiveStandard> standardOptional = archiveStandardRepository.findById(archive.getSalaryStandard());
+        if (standardOptional.isPresent()) {
+          ArchiveStandard standard = standardOptional.get();
+          archive.setSalaryStandardName(standard.getStandardName());
+        }
+      }
+    } catch (Exception e) {
+      log.error("获取薪酬标准名称失败", e);
+    }
+  }
+
   // 转换Map为JSON字符串
   private String convertMapToJson(Map<String, Object> map) {
     try {
@@ -680,6 +717,17 @@ public class ArchiveService {
     log.info("开始为档案 {} 创建用户账号", archive.getArcId());
 
     try {
+      Long posId = null;
+      List<Position> list = positionRepository.findByOrgIdAndPosName(
+              archive.getThirdOrgId(), archive.getPositionName());
+      if (list != null && !list.isEmpty()) {
+          posId = list.get(0).getPosId();
+      }
+      if (posId == null) {
+          throw new BusinessException(ResultCode.BUSINESS_ERROR,
+                  "无法找到三级机构[" + archive.getThirdOrgId() + "]下职位[" + archive.getPositionName() + "]，请先维护职位设置");
+      }
+
       // 检查是否已存在相同档案ID的用户
       Optional<User> existingUser = userRepository.findByArchiveId(archive.getArcId());
       if (existingUser.isPresent()) {
@@ -698,6 +746,8 @@ public class ArchiveService {
       user.setEmail(archive.getEmail());
       user.setPhone(archive.getPhone());
       user.setOrgId(archive.getThirdOrgId()); // 使用三级机构ID
+      user.setOrgId(archive.getThirdOrgId());
+      user.setPosId(posId); 
       user.setEntryDate(LocalDate.now()); // 入职时间就是建档成功时间
       user.setStatus(1); // 在职状态
 
