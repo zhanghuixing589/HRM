@@ -166,111 +166,6 @@
           </div>
         </el-form-item>
 
-        <!-- 在选择职位后，显示等级选择 -->
-<div v-if="formData.positionIds.length > 0" class="position-levels">
-  <el-divider content-position="left">职位等级配置</el-divider>
-  
-  <el-row :gutter="10">
-    <el-col 
-      v-for="positionId in formData.positionIds" 
-      :key="positionId" 
-      :span="12" 
-      style="margin-bottom: 10px;">
-      
-      <el-card shadow="hover" size="small">
-        <div slot="header">
-          <span>{{ getPositionById(positionId).posName }}</span>
-          <el-tag 
-            v-if="getPositionLevelStatus(positionId)" 
-            :type="getPositionLevelStatus(positionId).type"
-            size="mini" 
-            style="float: right;">
-            {{ getPositionLevelStatus(positionId).text }}
-          </el-tag>
-        </div>
-        
-        <el-select 
-          v-model="positionLevels[positionId]" 
-          placeholder="请选择等级"
-          style="width: 100%"
-          :disabled="!isEditable"
-          clearable
-          @change="handleLevelChange(positionId)">
-          <el-option label="初级" value="初级" />
-          <el-option label="中级" value="中级" />
-          <el-option label="高级" value="高级" />
-        </el-select>
-      </el-card>
-    </el-col>
-  </el-row>
-</div>
-        
-        <!-- 已选职位展示 -->
-        <div v-if="formData.positionIds.length > 0" class="selected-positions">
-          <el-divider content-position="left">
-            <span>已选职位 ({{ formData.positionIds.length }})</span>
-          </el-divider>
-          
-          <el-row :gutter="10" style="margin-top: 10px;">
-            <el-col 
-              v-for="positionId in formData.positionIds" 
-              :key="positionId" 
-              :xs="24" 
-              :sm="12" 
-              :md="8" 
-              :lg="6"
-              style="margin-bottom: 10px;"
-            >
-              <el-card shadow="hover" class="position-card">
-                <div slot="header" class="position-card-header">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold;">{{ getPositionById(positionId).posName }}</span>
-                    <el-tag 
-                      size="mini" 
-                      :type="getPositionById(positionId).status === 1 ? 'success' : 'danger'"
-                    >
-                      {{ getPositionById(positionId).status === 1 ? '启用' : '禁用' }}
-                    </el-tag>
-                  </div>
-                </div>
-                
-                <div class="position-card-content">
-                  <div style="margin-bottom: 5px;">
-                    <span style="color: #909399; font-size: 12px;">职位编码：</span>
-                    <span>{{ getPositionById(positionId).posCode }}</span>
-                  </div>
-                  
-                  <div style="margin-bottom: 5px;">
-                    <span style="color: #909399; font-size: 12px;">所属机构：</span>
-                    <el-tooltip 
-                      :content="getPositionById(positionId).orgFullPath" 
-                      placement="top"
-                    >
-                      <span>{{ getPositionById(positionId).orgName }}</span>
-                    </el-tooltip>
-                  </div>
-                  
-                  <div style="margin-bottom: 5px;">
-                    <span style="color: #909399; font-size: 12px;">机构类型：</span>
-                    <span>{{ getOrgTypeText(getPositionById(positionId).orgType) }}</span>
-                  </div>
-                  
-                  <div v-if="isEditable" style="text-align: center; margin-top: 10px;">
-                    <el-button 
-                      type="danger" 
-                      size="mini" 
-                      icon="el-icon-delete"
-                      @click="removeSelectedPosition(positionId)"
-                    >
-                      移除
-                    </el-button>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
-
         <!-- 制定人信息 -->
         <el-row :gutter="20">
           <el-col :span="12">
@@ -978,6 +873,7 @@ export default {
           await this.loadStandardDetail()
         } else {
           // 创建模式：添加默认空项目
+          await this.generateLocalCode()
           this.addDefaultSalaryItem()
         }
         
@@ -1760,10 +1656,7 @@ export default {
   color: #c0c4cc;
 }
 
-/* 已选职位卡片样式 */
-.selected-positions {
-  margin-top: 20px;
-}
+
 
 .position-card {
   border: 1px solid #e4e7ed;
