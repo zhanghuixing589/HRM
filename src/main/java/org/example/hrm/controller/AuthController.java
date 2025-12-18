@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.hrm.common.Result;
 import org.example.hrm.entity.User;
 import org.example.hrm.util.JwtTokenUtil;
-import org.example.hrm.service.MenuService;
 import org.example.hrm.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,12 +31,9 @@ public class AuthController {
     
     @Autowired
     private UserService userService;
-    
-    @Autowired
-    private MenuService menuService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {  
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         try {
             // 验证用户名密码
             Authentication authentication = authenticationManager.authenticate(
@@ -58,20 +54,20 @@ public class AuthController {
             if (user.getStatus() == 0) {
                 return ResponseEntity.badRequest().body(Result.error("用户已离职"));
             }
+
+            if (user.getStatus() == 2) {
+                return ResponseEntity.badRequest().body(Result.error("用户已禁用"));
+            }
             
             // 生成JWT token
             final UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             
             final String token = jwtTokenUtil.generateToken(userDetails, user.getRoleType(), user.getUserId());
             
-            // 获取用户菜单权限
-            var menus = menuService.getMenusByRoleType(user.getRoleType());
-            
             // 构建返回结果
             Map<String, Object> result = new HashMap<>();
             result.put("token", jwtTokenUtil.getTokenPrefix() + token);
             result.put("user", user);
-            result.put("menus", menus);
             result.put("roleType", user.getRoleType());
             result.put("redirectUrl", getRedirectUrl(user.getRoleType()));
 
@@ -82,16 +78,6 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
         }
     }
-    
-    // @PostMapping("/register")
-    // public ResponseEntity<?> register(@Valid @RequestBody User user) {
-    //     try {
-    //         User savedUser = userService.register(user);
-    //         return ResponseEntity.ok(Result.success(savedUser));
-    //     } catch (Exception e) {
-    //         return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
-    //     }
-    // }
     
     @GetMapping("/userinfo")
     public ResponseEntity<?> getUserInfo(@RequestHeader("Authorization") String token) {
@@ -107,11 +93,8 @@ public class AuthController {
                 return ResponseEntity.badRequest().body(Result.error("用户不存在"));
             }
             
-            var menus = menuService.getMenusByRoleType(user.getRoleType());
-            
             Map<String, Object> result = new HashMap<>();
             result.put("user", user);
-            result.put("menus", menus);
             result.put("roleType", user.getRoleType());
             
             return ResponseEntity.ok(Result.success(result));
@@ -125,7 +108,7 @@ public class AuthController {
     private String getRedirectUrl(Integer roleType) {
         switch (roleType) {
             case 1: // 系统管理员
-                return "/admin/dashboard";
+                return "/admin/user-role";
             case 2: // 人事经理
             case 4: // 人事专员
                 return "/hr/archive";

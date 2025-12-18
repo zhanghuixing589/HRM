@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "user")
@@ -47,12 +49,14 @@ public class User {
     @Column(name = "role_type")
     private Integer roleType; // 角色类型（1-系统管理员，2-人事经理...）
 
-    // 添加入职时间和离职时间
     @Column(name = "entry_date")
     private LocalDate entryDate; // 入职日期
     
     @Column(name = "leave_date")
     private LocalDate leaveDate; // 离职日期（离职状态时填写）
+
+    @Column(name = "arc_id")
+    private Long archiveId; // 关联档案ID
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Column(name = "create_time")
@@ -87,9 +91,42 @@ public class User {
     @Transient
     private Integer workYears; // 工作年限
 
-     /**
-     * JPA 保存前的回调方法
-     */
+    @Transient
+    private String roleTypeName;
+
+    // 多对多角色关联
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "user_role",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private List<Role> roles = new ArrayList<>();
+
+    @Transient
+    private String orgPath;
+    public String getOrgPath() {
+        return orgPath;
+    }
+    public void setOrgPath(String orgPath) {
+        this.orgPath = orgPath;
+    }
+
+    // 获取主角色类型名称
+    public String getRoleTypeName() {
+        if (this.roleType == null) return "未知";
+        switch (this.roleType) {
+            case 1: return "系统管理员";
+            case 2: return "人事经理";
+            case 3: return "薪酬经理";
+            case 4: return "人事专员";
+            case 5: return "薪酬专员";
+            case 6: return "普通员工";
+            default: return "未知";
+        }
+    }
+
+    // JPA 保存前的回调方法
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();

@@ -24,7 +24,6 @@ import java.util.List;
 @RequestMapping("/hr/organization")
 @CrossOrigin
 @Slf4j
-@PreAuthorize("hasRole('HR_MANAGER')") // 只有人事经理可以操作
 public class OrganizationController {
 
   @Autowired

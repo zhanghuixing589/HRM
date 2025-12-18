@@ -31,10 +31,8 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long>, JpaSpec
   // 根据多个状态查询
   List<Archive> findByStatusIn(List<Integer> statuses);
 
-  // 根据复核人查询 - 注意数据库字段名是 rewiewId
-  // @Query("SELECT a FROM Archive a WHERE a.reviewId = :reviewId")
-  // List<Archive> findByReviewId(@Param("reviewId") Long reviewId);
-  List<Archive> findByReviewId(Long reviewId);  // 直接使用JPA方法名查询
+  // 根据复核人查询
+  List<Archive> findByReviewId(Long reviewId); 
 
   // 查询需要复核的档案（status为1或4）
   @Query("SELECT a FROM Archive a WHERE a.status IN (1, 4)")

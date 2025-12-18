@@ -58,4 +58,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
   // 分页查询所有三级机构
   @Query("SELECT o FROM Organization o WHERE o.orgLevel = 3")
   Page<Organization> findAllThirdLevelOrgs(Pageable pageable);
+
+  @Query("SELECT o FROM Organization o WHERE o.orgName LIKE %:keyword%")
+  List<Organization> findByOrgNameLike(@Param("keyword") String keyword);
 }
