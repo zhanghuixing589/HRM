@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -184,5 +185,75 @@ public class UserController {
 public ResponseEntity<String> test() {
     log.info("=== 测试端点被调用 ===");
     return ResponseEntity.ok("Test endpoint works!");
+}
+
+
+
+/**
+ * 根据机构ID获取员工列表
+ */
+@GetMapping("/org/{orgId}/employees")
+public ResponseEntity<Map<String, Object>> getEmployeesByOrgId(@PathVariable Long orgId) {
+    try {
+        log.info("根据机构ID获取员工列表: {}", orgId);
+        System.out.println("根据机构ID获取员工列表：" + orgId);
+        
+        // 调用Service获取员工列表
+        List<UserArchiveVO> employees = userService.getEmployeesByOrgId(orgId);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 200);
+        result.put("success", true);
+        result.put("message", "success");
+        result.put("data", employees);
+        
+        return ResponseEntity.ok(result);
+        
+    } catch (Exception e) {
+        log.error("获取机构员工列表失败，orgId: {}", orgId, e);
+        System.out.println("获取机构员工列表失败，orgId: " + orgId + ", 错误信息: " + e.getMessage());
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 500);
+        result.put("success", false);
+        result.put("message", e.getMessage());
+        result.put("data", null);
+        
+        return ResponseEntity.status(500).body(result);
+    }
+}
+
+/**
+ * 根据机构ID获取员工数量
+ */
+@GetMapping("/org/{orgId}/employee-count")
+public ResponseEntity<Map<String, Object>> getEmployeeCountByOrgId(@PathVariable Long orgId) {
+    try {
+        log.info("根据机构ID获取员工数量: {}", orgId);
+        System.out.println("根据机构ID获取员工数量：" + orgId);
+        
+        // 调用Service获取员工数量
+        Integer count = userService.getEmployeeCountByOrgId(orgId);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 200);
+        result.put("success", true);
+        result.put("message", "success");
+        result.put("data", count != null ? count : 0);
+        
+        return ResponseEntity.ok(result);
+        
+    } catch (Exception e) {
+        log.error("获取机构员工数量失败，orgId: {}", orgId, e);
+        System.out.println("获取机构员工数量失败，orgId: " + orgId + ", 错误信息: " + e.getMessage());
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 500);
+        result.put("success", false);
+        result.put("message", e.getMessage());
+        result.put("data", 0);
+        
+        return ResponseEntity.status(500).body(result);
+    }
 }
 }

@@ -18,7 +18,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/hr/organization")
@@ -241,6 +243,8 @@ public class OrganizationController {
     }
   }
 
+  
+
   /**
    * 分页获取机构列表
    */
@@ -278,4 +282,74 @@ public class OrganizationController {
       return Result.error("分页获取机构树失败: " + e.getMessage());
     }
   }
+
+  /**
+ * 根据ID获取机构详情
+ */
+@GetMapping("/{orgId}")
+public Result<Organization> getOrganizationById(@PathVariable Long orgId) {
+    try {
+        Organization organization = organizationService.getOrgById(orgId);
+        if (organization == null) {
+            return Result.error("机构不存在");
+        }
+        return Result.success(organization);
+    } catch (Exception e) {
+        log.error("获取机构详情失败", e);
+        return Result.error("获取机构详情失败: " + e.getMessage());
+    }
+}
+
+/**
+ * 获取机构完整信息（包括父级机构信息）
+ */
+@GetMapping("/detail/{orgId}")
+public Result<Map<String, Object>> getOrganizationDetail(@PathVariable Long orgId) {
+    try {
+        Organization organization = organizationService.getOrgById(orgId);
+        if (organization == null) {
+            return Result.error("机构不存在");
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("orgId", organization.getOrgId());
+        result.put("orgName", organization.getOrgName());
+        result.put("orgCode", organization.getOrgCode());
+        result.put("orgType", organization.getOrgLevel()); // orgLevel对应前端的orgType
+        result.put("orgLevel", organization.getOrgLevel());
+        result.put("status", organization.getStatus());
+        
+        // 获取父级机构信息（如果有）
+        if (organization.getParId() != null) {
+            Organization parentOrg = organizationService.getOrgById(organization.getParId());
+            if (parentOrg != null) {
+                result.put("parentOrgId", parentOrg.getOrgId());
+                result.put("parentOrgName", parentOrg.getOrgName());
+                result.put("parentOrgLevel", parentOrg.getOrgLevel());
+                
+                // 如果是三级机构，尝试获取一级和二级机构
+                if (organization.getOrgLevel() == 3 && parentOrg.getParId() != null) {
+                    Organization grandParentOrg = organizationService.getOrgById(parentOrg.getParId());
+                    if (grandParentOrg != null) {
+                        result.put("firstOrgId", grandParentOrg.getOrgId());
+                        result.put("firstOrgName", grandParentOrg.getOrgName());
+                        result.put("secondOrgId", parentOrg.getOrgId());
+                        result.put("secondOrgName", parentOrg.getOrgName());
+                        result.put("thirdOrgId", organization.getOrgId());
+                        result.put("thirdOrgName", organization.getOrgName());
+                    }
+                }
+            }
+        }
+        
+        // 获取机构下的员工数量（需要调用其他服务）
+        // Integer employeeCount = archiveService.getEmployeeCountByOrgId(orgId);
+        // result.put("employeeCount", employeeCount != null ? employeeCount : 0);
+        
+        return Result.success(result);
+    } catch (Exception e) {
+        log.error("获取机构详情失败", e);
+        return Result.error("获取机构详情失败: " + e.getMessage());
+    }
+}
 }

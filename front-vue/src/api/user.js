@@ -72,7 +72,19 @@ export const testApiConnection = () => {
   return api.get('/api/user/health')
 }
 
+/**
+ * 根据机构ID获取员工列表
+ */
+export const getEmployeesByOrgId = (orgId) => {
+  return api.get(`/api/user/org/${orgId}/employees`)
+}
 
+/**
+ * 根据机构ID获取员工数量
+ */
+export const getEmployeeCountByOrgId = (orgId) => {
+  return api.get(`/api/user/org/${orgId}/employee-count`)
+}
 
 /**
  * 档案相关API

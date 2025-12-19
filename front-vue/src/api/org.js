@@ -18,12 +18,13 @@ export const toggleOrg = (id, st) => {
   return api.put(`${base}/${id}/status/${st}`)
 }
 
-// 新增：获取机构详情
+// 获取机构详情 - 使用新的detail接口
 export const getOrgById = (id) => {
-  return api.get(`${base}/${id}`)
+  return api.get(`${base}/detail/${id}`)
 }
 
 // 新增：根据级别获取机构
 export const getOrgsByLevel = (level) => {
   return api.get(`${base}/level/${level}`)
 }
+

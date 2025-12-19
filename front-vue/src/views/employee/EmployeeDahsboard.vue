@@ -145,7 +145,7 @@
       </div>
 
       <!-- 快捷操作 -->
-     <!--  <div class="quick-actions">
+      <div class="quick-actions">
         <h3>快捷操作</h3>
         <div class="action-buttons">
           <button class="action-btn primary" @click="goToEdit">
@@ -161,7 +161,7 @@
             <i class="btn-icon">🚪</i>退出登录
           </button>
         </div>
-      </div> -->
+      </div>
     </div>
   </div>
 </template>

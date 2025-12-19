@@ -62,3 +62,12 @@ export const getAllThirdLevelOrgs = () => {
   return api.get(`/api/salary/payment/third-level/all`)
 }
 
+// 新增创建薪酬单API
+export const createSalaryPayment = (data) => {
+  return api.post('/api/salary/payment/create', data)
+}
+
+// 获取薪酬单详情
+export const getSalaryPaymentDetail = (paymentId) => {
+  return api.get(`/api/salary/payment/${paymentId}`)
+}

@@ -5,6 +5,7 @@ import net.bytebuddy.dynamic.DynamicType.Builder.FieldDefinition.Optional;
 
 import org.example.hrm.vo.UserArchiveVO;
 import org.example.hrm.entity.Archive;
+import org.example.hrm.entity.Organization;
 import org.example.hrm.entity.User;
 import org.example.hrm.repository.ArchiveRepository;
 import org.example.hrm.repository.OrganizationRepository;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -364,4 +366,230 @@ public List<Map<String, Object>> batchGetUserNames(List<Long> userIds) {
         return getCurrentUserInfo(userId);
     }
     
+
+/**
+ * 根据机构ID获取员工列表
+ */
+public List<UserArchiveVO> getEmployeesByOrgId(Long orgId) {
+    try {
+        log.info("根据机构ID {} 查询员工列表", orgId);
+        
+        // 1. 查询机构信息，确定机构层级
+        java.util.Optional<Organization> orgOpt = organizationRepository.findById(orgId);
+        if (!orgOpt.isPresent()) {
+            log.warn("机构 {} 不存在", orgId);
+            return new ArrayList<>();
+        }
+        
+        Organization org = orgOpt.get();
+        Integer orgLevel = org.getOrgLevel();
+        
+        // 2. 根据机构层级查询档案
+        List<Archive> archives;
+        if (orgLevel == 1) {
+            // 一级机构：查询所有下属机构的档案
+            archives = archiveRepository.findByFirstOrgId(orgId);
+        } else if (orgLevel == 2) {
+            // 二级机构：查询所有下属三级机构的档案
+            archives = archiveRepository.findBySecondOrgId(orgId);
+        } else {
+            // 三级机构：直接查询该机构的档案
+            archives = archiveRepository.findByThirdOrgId(orgId);
+        }
+        
+        if (archives == null || archives.isEmpty()) {
+            log.info("机构 {} 下没有员工档案", orgId);
+            return new ArrayList<>();
+        }
+        
+        // 3. 过滤只显示已通过的档案（status=2）
+        List<Archive> activeArchives = archives.stream()
+            .filter(archive -> archive.getStatus() == 2) // 状态2表示已通过
+            .collect(Collectors.toList());
+        
+        if (activeArchives.isEmpty()) {
+            log.info("机构 {} 下没有已通过的员工档案", orgId);
+            return new ArrayList<>();
+        }
+        
+        // 4. 转换为VO
+        List<UserArchiveVO> result = new ArrayList<>();
+        for (Archive archive : activeArchives) {
+            try {
+                UserArchiveVO vo = convertArchiveToVO(archive);
+                if (vo != null) {
+                    result.add(vo);
+                }
+            } catch (Exception e) {
+                log.error("转换档案 {} 失败", archive.getArcCode(), e);
+            }
+        }
+        
+        log.info("机构 {} ({}级) 下找到 {} 名已通过的员工", 
+                 org.getOrgName(), orgLevel, result.size());
+        return result;
+        
+    } catch (Exception e) {
+        log.error("查询机构员工列表失败", e);
+        throw new RuntimeException("查询机构员工列表失败: " + e.getMessage());
+    }
 }
+
+/**
+ * 根据机构ID获取员工数量
+ */
+public Integer getEmployeeCountByOrgId(Long orgId) {
+    try {
+        log.info("统计机构 {} 的员工数量", orgId);
+        
+        // 查询机构信息
+        java.util.Optional<Organization> orgOpt = organizationRepository.findById(orgId);
+        if (!orgOpt.isPresent()) {
+            return 0;
+        }
+        
+        Organization org = orgOpt.get();
+        Integer orgLevel = org.getOrgLevel();
+        
+        // 根据机构层级查询档案
+        List<Archive> archives;
+        if (orgLevel == 1) {
+            archives = archiveRepository.findByFirstOrgId(orgId);
+        } else if (orgLevel == 2) {
+            archives = archiveRepository.findBySecondOrgId(orgId);
+        } else {
+            archives = archiveRepository.findByThirdOrgId(orgId);
+        }
+        
+        if (archives == null) {
+            return 0;
+        }
+        
+        // 统计已通过的档案数量
+        long count = archives.stream()
+            .filter(archive -> archive.getStatus() == 2) // 状态2表示已通过
+            .count();
+        
+        return (int) count;
+        
+    } catch (Exception e) {
+        log.error("统计机构员工数量失败", e);
+        return 0;
+    }
+}
+
+/**
+ * 将Archive转换为UserArchiveVO
+ */
+private UserArchiveVO convertArchiveToVO(Archive archive) {
+    if (archive == null) {
+        return null;
+    }
+    
+    try {
+
+        System.out.println("=== 开始转换Archive为VO ===");
+        System.out.println("档案ID: " + archive.getArcId() + ", 姓名: " + archive.getName() + ", 状态: " + archive.getStatus());
+        UserArchiveVO vo = new UserArchiveVO();
+        
+        // 设置档案基本信息
+        vo.setArcId(archive.getArcId());
+        vo.setArcCode(archive.getArcCode());
+        vo.setName(archive.getName());
+        vo.setSex(archive.getSex());
+        vo.setIdCard(archive.getIdCard());
+        vo.setFirstOrgId(archive.getFirstOrgId());
+        vo.setSecondOrgId(archive.getSecondOrgId());
+        vo.setThirdOrgId(archive.getThirdOrgId());
+        vo.setPositionName(archive.getPositionName());
+        vo.setTitle(archive.getTitle());
+        vo.setSalaryStandard(archive.getSalaryStandard());
+        vo.setBirDate(archive.getBirDate());
+        vo.setNationality(archive.getNationality());
+        vo.setQualification(archive.getQualification());
+        vo.setPhotoPath(archive.getPhotoPath());
+        vo.setTelephone(archive.getTelephone());
+        vo.setAddress(archive.getAddress());
+        vo.setZipCode(archive.getZipCode());
+        vo.setCountry(archive.getCountry());
+        vo.setBirAddress(archive.getBirAddress());
+        vo.setBelief(archive.getBelief());
+        vo.setIdentity(archive.getIdentity());
+        vo.setMajor(archive.getMajor());
+        vo.setArchiveStatus(archive.getStatus());
+        vo.setReason(archive.getReason());
+        vo.setResubmitCount(archive.getResubmitCount());
+        
+        log.info("档案基本信息设置完成 - ArcCode: {}, Name: {}, ThirdOrgId: {}", 
+                 vo.getArcCode(), vo.getName(), vo.getThirdOrgId());
+
+        // 设置机构名称
+        setArchiveOrganizationInfo(archive, vo);
+        
+        // 查找关联的用户信息
+        java.util.Optional<User> userOpt = userRepository.findByArchiveId(archive.getArcId());
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            vo.setUserId(user.getUserId());
+            vo.setUserCode(user.getUserCode());
+            vo.setUserName(user.getUserName());
+            vo.setEmail(user.getEmail());
+            vo.setPhone(user.getPhone());
+            vo.setOrgId(user.getOrgId());
+            vo.setPosId(user.getPosId());
+            vo.setStatus(user.getStatus());
+            vo.setCreateTime(user.getCreateTime());
+            vo.setUpdateTime(user.getUpdateTime());
+            vo.setRoleType(user.getRoleType());
+            vo.setEntryDate(user.getEntryDate());
+            vo.setLeaveDate(user.getLeaveDate());
+            vo.setArchiveId(user.getArchiveId());
+
+             log.info("用户信息设置完成 - UserCode: {}, UserName: {}", 
+                     vo.getUserCode(), vo.getUserName());
+            
+            // 如果没有机构信息，使用用户表中的机构
+            if (vo.getOrgId() != null && vo.getOrgName() == null) {
+                organizationRepository.findById(vo.getOrgId())
+                    .ifPresent(org -> vo.setOrgName(org.getOrgName()));
+            }
+        } else {
+            vo.setStatus(0); // 0表示未关联用户
+        }
+        
+        return vo;
+        
+    } catch (Exception e) {
+        log.error("转换Archive为VO失败", e);
+        return null;
+    }
+}
+
+/**
+ * 为档案设置机构信息
+ */
+private void setArchiveOrganizationInfo(Archive archive, UserArchiveVO vo) {
+    // 设置一级机构名称
+    if (archive.getFirstOrgId() != null) {
+        organizationRepository.findById(archive.getFirstOrgId())
+            .ifPresent(org -> vo.setFirstOrgName(org.getOrgName()));
+    }
+    
+    // 设置二级机构名称
+    if (archive.getSecondOrgId() != null) {
+        organizationRepository.findById(archive.getSecondOrgId())
+            .ifPresent(org -> vo.setSecondOrgName(org.getOrgName()));
+    }
+    
+    // 设置三级机构名称
+    if (archive.getThirdOrgId() != null) {
+        organizationRepository.findById(archive.getThirdOrgId())
+            .ifPresent(org -> {
+                vo.setThirdOrgName(org.getOrgName());
+                vo.setOrgId(org.getOrgId()); // 设置主机构ID
+                vo.setOrgName(org.getOrgName()); // 设置主机构名称
+            });
+    }
+}
+}
+

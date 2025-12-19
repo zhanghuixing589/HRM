@@ -1,6 +1,8 @@
 package org.example.hrm.repository;
 
 import org.example.hrm.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -48,5 +50,34 @@ List<Map<String, Object>> findUserNamesByIds(@Param("userIds") List<Long> userId
   int updateUserStatusByArchiveId(@Param("archiveId") Long archiveId, 
                                   @Param("status") Integer status, 
                                   @Param("leaveDate") LocalDate leaveDate);
+
+
+/**
+ * 根据机构ID查询用户列表
+ */
+List<User> findByOrgId(Long orgId);
+
+/**
+ * 根据机构ID查询用户数量
+ */
+long countByOrgId(Long orgId);
+
+/**
+ * 根据机构ID和状态查询用户
+ */
+List<User> findByOrgIdAndStatus(Long orgId, Integer status);
+
+/**
+ * 根据多个机构ID查询用户
+ */
+@Query("SELECT u FROM User u WHERE u.orgId IN :orgIds AND u.status = 1")
+List<User> findByOrgIdsIn(@Param("orgIds") List<Long> orgIds);
+
+/**
+ * 根据机构ID分页查询用户
+ */
+Page<User> findByOrgId(Long orgId, Pageable pageable);
+
 }
+
 

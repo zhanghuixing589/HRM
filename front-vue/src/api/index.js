@@ -3,12 +3,14 @@ console.log('userApi对象:', userApi)  // 添加这行查看userApi的内容
 // src/api/index.js - 统一导出
 import userApi from './user'
 import authApi from './auth'  // 假设你已有auth.js
+import OrgApi from './org'
 
 
 
 const api = {
   user: userApi,
   auth: authApi,
+  org : OrgApi
   // salary: salaryApi,
   // archive: archiveApi
 }

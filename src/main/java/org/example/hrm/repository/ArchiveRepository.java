@@ -40,4 +40,32 @@ public interface ArchiveRepository extends JpaRepository<Archive, Long>, JpaSpec
 
   // 根据复核人和状态查询
   List<Archive> findByReviewIdAndStatus(Long reviewId, Integer status);
+
+  // ArchiveRepository.java - 添加以下方法
+
+/**
+ * 根据二级机构ID查询档案
+ */
+@Query("SELECT a FROM Archive a WHERE a.secondOrgId = :secondOrgId")
+List<Archive> findBySecondOrgId(@Param("secondOrgId") Long secondOrgId);
+
+/**
+ * 根据一级机构ID查询档案
+ */
+@Query("SELECT a FROM Archive a WHERE a.firstOrgId = :firstOrgId")
+List<Archive> findByFirstOrgId(@Param("firstOrgId") Long firstOrgId);
+
+/**
+ * 根据任意机构ID查询档案（包括所有层级）
+ */
+@Query("SELECT a FROM Archive a WHERE a.firstOrgId = :orgId OR a.secondOrgId = :orgId OR a.thirdOrgId = :orgId")
+List<Archive> findByAnyOrgId(@Param("orgId") Long orgId);
+
+/**
+ * 根据机构ID和状态查询档案
+ */
+@Query("SELECT a FROM Archive a WHERE a.thirdOrgId = :orgId AND a.status = :status")
+List<Archive> findByOrgIdAndStatus(@Param("orgId") Long orgId, @Param("status") Integer status);
+
+
 }
