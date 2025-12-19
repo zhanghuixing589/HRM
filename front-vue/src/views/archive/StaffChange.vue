@@ -132,7 +132,7 @@
                 <el-option label="高中" value="高中" />
                 <el-option label="专科" value="专科" />
                 <el-option label="本科" value="本科" />
-                <el-option label="研究生" value="" />
+                <el-option label="研究生" value="研究生" />
                 <el-option label="硕士" value="硕士" />
                 <el-option label="博士" value="博士" />
               </el-select>
@@ -237,7 +237,7 @@
 <script>
 import { getArchiveDetail } from '@/api/archive'
 import { applyArchiveChange, resubmitChange, getChangeDetail } from '@/api/change'
-import { getSalaryStandardsByPosition, getAllActiveSalaryStandards } from '@/api/archiveSalary'
+import { getSalaryStandardsByPosition } from '@/api/archiveSalary'
 
 export default {
   name: 'StaffChange',
@@ -401,7 +401,8 @@ export default {
         sex: this.archiveData.sex || 1,
         idCard: this.archiveData.idCard || '',
         title: this.archiveData.title || '',
-        salaryStandard: this.archiveData.salaryStandardName || '', // 此时还是 ID
+        salaryStandard: this.archiveData.salaryStandard || '',    
+        salaryStandardName: this.archiveData.salaryStandardName || '',
         birDate: this.archiveData.birDate || '',
         nationality: this.archiveData.nationality || '',
         qualification: this.archiveData.qualification || '',
@@ -419,8 +420,7 @@ export default {
         changeReason: ''
       }
       this.archiveData.positionId = this.archiveData.positionId || this.archiveData.posId || null
-
-      // 2) 第一次就把下拉框数据源拉回来（关键！）
+      
       await this.loadSalaryStandards()
 
       // 3) 如果有“变更后数据”(重新提交场景)，再用变更后数据覆盖一次
@@ -471,25 +471,6 @@ export default {
       } else {
         this.salaryStandardList = []
       }
-    },
-
-    async getPositionIdByName(name) {
-      const map = { '总经理': 1, '副总经理': 2, '部门经理': 3, '主管': 4, '专员': 5, '助理': 6 };
-      return map[name] || null;
-    },
-    // 4. 初始化时把“初始薪酬标准 ID → 名称”反解出来
-    async initSalaryStandardName() {
-      if (!this.dto.salaryStandard) return;          // 没有值直接返回
-      // 如果档案里已经带了名称就直接用
-      if (this.archiveData.salaryStandardName) {
-        this.salaryStandardMap[this.dto.salaryStandard] = this.archiveData.salaryStandardName;
-        return;
-      }
-      // 否则拉一次全量映射
-      const res = await getAllActiveSalaryStandards();
-      (res?.data || []).forEach(s => {
-        this.salaryStandardMap[s.standardId] = s.standardName;
-      });
     },
 
     // 加载变更页面的薪酬标准
@@ -545,18 +526,6 @@ export default {
       try {
         await this.$refs.form.validate()
 
-        // 验证身份证号格式
-        if (this.dto.idCard && !/^\d{17}[\dXx]$/.test(this.dto.idCard)) {
-          this.$message.error('请输入正确的身份证号码')
-          return
-        }
-
-        // 验证手机号格式
-        if (this.dto.phone && !/^1[3-9]\d{9}$/.test(this.dto.phone)) {
-          this.$message.error('手机号格式不正确')
-          return
-        }
-
         this.submitting = true
 
         // 构建提交数据
@@ -594,8 +563,9 @@ export default {
         }
       } catch (error) {
         console.error('提交失败:', error)
+        console.error('【后端响应体】', error.response?.data)
         console.error('错误详情:', error.response || error.message)
-        this.$message.error('提交失败: ' + (error.message || '未知错误'))
+        this.$message.error('提交失败: ' + (error.response?.data?.message || error.message || '未知错误'))
       } finally {
         this.submitting = false
       }

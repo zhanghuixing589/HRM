@@ -146,7 +146,6 @@
 
         <!-- 可修改信息 -->
         <h4 style="margin: 0 0 15px 0; color: #409EFF;">
-          <i class="el-icon-edit" style="margin-right: 5px;"></i>
           变更后档案信息
         </h4>
 
@@ -182,11 +181,17 @@
 
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-descriptions-item label="薪酬标准">
-                <span style="color: #606266; font-weight: 500;">
-                  {{ currentChange.afterDataParsed?.salaryStandardName || currentChange.afterDataParsed?.salaryStandard || '--' }}
-                </span>
-              </el-descriptions-item>
+              <el-form-item label="薪酬标准">
+                <el-select
+                  :value="reviewData.afterDataParsed.salaryStandard"
+                  disabled
+                  style="width: 100%">
+                  <!-- 把当前这一项作为唯一 option 塞进去，就能显示文字 + 保留箭头样式 -->
+                  <el-option
+                    :label="salaryStandardMap[reviewData.afterDataParsed.salaryStandard]"
+                    :value="reviewData.afterDataParsed.salaryStandard" />
+                </el-select>
+              </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="出生日期">
@@ -608,6 +613,11 @@ export default {
 
       // 初始化表单数据
       const afterData = this.reviewData.afterDataParsed || {}
+
+      console.log('1. 要映射的ID', this.reviewData.afterDataParsed.salaryStandard)
+      console.log('2. 当前字典', this.salaryStandardMap)
+      console.log('3. 映射结果', this.salaryStandardMap[this.reviewData.afterDataParsed.salaryStandard])
+      console.log('4. 字段存在？', 'salaryStandard' in this.reviewData.afterDataParsed)
 
       // 将变更后的数据赋值给表单
       this.reviewForm.name = afterData.name || ''

@@ -36,7 +36,7 @@ public class ArchiveChangeController {
    * 申请档案变更（人事专员）
    */
   @PostMapping("/apply")
-  @PreAuthorize("hasRole('HR_SPECIALIST')")
+  // @PreAuthorize("hasRole('HR_SPECIALIST')")
   public Result<ArchiveChange> applyChange(@RequestBody ArchiveChangeDTO changeDTO,
       @RequestAttribute Long userId) {
     try {

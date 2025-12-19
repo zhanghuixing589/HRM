@@ -16,6 +16,14 @@ const routes = [
     name: 'HrmLayout',
     component: () => import('@/views/HrmLayout.vue')
   },
+     {
+        path: '/admin/user-role',
+        name: 'UserRoleManagement',
+        component: () => import('@/views/admin/UserRoleManagement.vue'),
+        meta: {
+          roles: [1]
+        }
+  },
 
   {
     path:'/salary/manage',
@@ -111,7 +119,7 @@ const routes = [
   meta: { title: '薪酬发放表单', requiresAuth: true,
        roles: [1,3,5]
      }
-},
+  },  
 
 {
   path :'/employee/dashboard',
@@ -193,7 +201,7 @@ const routes = [
         }
       }
     ]
-  }
+  },
 ]
 
 const router = new VueRouter({

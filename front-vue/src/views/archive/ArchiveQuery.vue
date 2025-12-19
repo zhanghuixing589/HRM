@@ -375,6 +375,8 @@ export default {
           size: this.queryForm.size,
           status: 2 // 只能查询已通过的档案
         }
+
+        console.log('查询参数', params)
         
         // 添加筛选条件
         if (this.queryForm.firstOrgId) params.firstOrgId = this.queryForm.firstOrgId
